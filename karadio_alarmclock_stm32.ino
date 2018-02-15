@@ -525,9 +525,6 @@ void setup(void) {
 
 }
 
-
-//#include "karadio_alarmclock_stm32.h"
-
 ////////////////////////////////////////
 void removeUtf8(byte *characters)
 {
