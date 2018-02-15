@@ -1,5 +1,5 @@
 
-#include "karadio_LCDI2C_stm32.h"
+#include "karadio_alarmclock_stm32.h"
 
 
 HardwareTimer timer(2);
@@ -45,6 +45,9 @@ struct InfoScroll {
 InfoScroll Song = {0, "INIT...", 2, 900};
 
 uint16 alarm;
+
+bool isTimeInvalid;
+bool isIPInvalid;
 
 // ip
 char oip[20] = "___.___.___.___";
@@ -110,6 +113,7 @@ void localTime() {
     {
       minutes = 0;
       hours++;
+      isTimeInvalid = true; // every hour, ask for NTP time. Still need to quantify which deviation there is during 1 hour. (but it's not much. Probably seconds.)
       if (hours >= 24)
       {
         hours = 0;
@@ -345,31 +349,23 @@ static void uartTask(void *pvParameters) {
         flag_command[MODE]--;
         digitalWrite(PC13, LOW);
     }
+
+    if (isTimeInvalid) {
+      SERIALX.print(F("\r")); // cleaner
+      SERIALX.print(F("sys.date\r")); // Synchronise the current date over ntp
+      vTaskDelay(1000); // to avoid spamming ?
+    }
+    if (isIPInvalid) {      
+      SERIALX.print(F("\r")); // cleaner
+      SERIALX.print(F("wifi.status\r")); // Synchronise the current state
+      vTaskDelay(1000); // to avoid spamming ?
+    }
     
     serial();
     vTaskDelay(1);
   }
 
 }
-
-
-static void NTPTask(void *pvParameters) {
-  Serial.println(F("NTPTask"));
-  while (1)
-  {
-    vTaskDelay(5000);
-    SERIALX.print(F("\r")); // cleaner
-    SERIALX.print(F("wifi.status\r")); // Synchronise the current state
-    vTaskDelay(700);
-
-    vTaskDelay(95000);
-    SERIALX.print(F("\r")); // cleaner
-    SERIALX.print(F("sys.date\r")); // Synchronise the current date over ntp
-    vTaskDelay(95000);
-
-  }
-}
-
 
 
 ////////////////////////////////////////
@@ -417,6 +413,10 @@ void setup2(bool ini)
   alarm = 9*60+35;
   alarm |= (1 << 15);
   flag_screen[NEWALARM]++;
+
+  isTimeInvalid = true;
+  isIPInvalid = true;
+  delay(500);
 } // setup()
 
 
@@ -503,19 +503,17 @@ void setup(void) {
   setup2(false);
 
   /// HERE TASKS ARE CREATED (FREERTOS)
-  int s1 = xTaskCreate(mainTask, NULL, configMINIMAL_STACK_SIZE + 250, NULL, tskIDLE_PRIORITY + 2, NULL);
-  int s2 = xTaskCreate(uartTask, NULL, configMINIMAL_STACK_SIZE + 100, NULL, tskIDLE_PRIORITY + 3, NULL);
-  int s3 = xTaskCreate(NTPTask, NULL, configMINIMAL_STACK_SIZE + 100, NULL, tskIDLE_PRIORITY + 10, NULL);
-  //int s4 = xTaskCreate(localTimeTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
-  int s4 = pdPASS;
-  int s5 = xTaskCreate(printScrollRTOSTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
+  int s1 = xTaskCreate(mainTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+  int s2 = xTaskCreate(uartTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+  int s5 = xTaskCreate(printScrollRTOSTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
   int s6 = xTaskCreate(buttonsPollingTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
 
-  if ( s1 != pdPASS || s2 != pdPASS || s3 != pdPASS || s4 != pdPASS || s5 != pdPASS || s6 != pdPASS) {
+  if ( s1 != pdPASS || s2 != pdPASS || s5 != pdPASS || s6 != pdPASS) {
     Serial.println(F("Task or Semaphore creation problem.."));
     while (1);
   }
   timer2_init(); // initialize timer2
+  
   // Start the task scheduler - here the process starts
   vTaskStartScheduler();
   Serial.println(F("Started"));
@@ -524,9 +522,6 @@ void setup(void) {
   while (1);
 
 }
-
-
-#include "karadio_LCDI2C_stm32.h"
 
 ////////////////////////////////////////
 void removeUtf8(byte *characters)
@@ -700,11 +695,13 @@ void parse(char* line)
     minutes = dtl.tm_min;
     seconds = dtl.tm_sec;
     flag_screen[NEWTIME]++;
+    isTimeInvalid = false;
   }
 
   if ((ici = strstr(line, "IP: ")) != NULL)
   {
     strcpy(oip, ici + 4);
+    isIPInvalid = false;
   }
 
     //////Volume   ##CLI.VOL#:
