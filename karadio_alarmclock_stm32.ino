@@ -107,6 +107,15 @@ void localTime() {
   //Serial.println(seconds);
   seconds++;
   flag_screen[NEWTIME]++; // this makes the : blink
+  
+  // check every second time and IP
+  if (isTimeInvalid) {
+    isAskingTime = true;
+  }
+  if (isIPInvalid) {
+    isAskingIP = true;
+  }
+  
   if (seconds >= 60)
   {
     seconds = 0;
@@ -115,9 +124,13 @@ void localTime() {
     {
       minutes = 0;
       hours++;
+      // ask for NTP time every hour, to avoid derivating.
+      isTimeInvalid = true;
+      
       if (hours >= 24)
       {
         hours = 0;
+
       } //endif (hours)
     } // endif (minutes)
     // check alarm clock.
@@ -350,6 +363,18 @@ static void uartTask(void *pvParameters) {
         flag_command[MODE]--;
         digitalWrite(PC13, LOW);
     }
+
+    if (isAskingTime) {
+        SERIALX.print(F("\r")); // cleaner
+         SERIALX.print(F("sys.date\r")); // Synchronise the current state
+         isAskingTime = false;
+    }
+
+    if (isAskingIP) {
+        SERIALX.print(F("\r")); // cleaner
+         SERIALX.print(F("wifi.status\r")); // Synchronise the current state
+         isAskingTime = false;
+    }
     
     serial();
     vTaskDelay(1);
@@ -363,15 +388,6 @@ static void NTPTask(void *pvParameters) {
   while (1)
   {
     vTaskDelay(5000);
-    SERIALX.print(F("\r")); // cleaner
-    SERIALX.print(F("wifi.status\r")); // Synchronise the current state
-    vTaskDelay(700);
-
-    vTaskDelay(95000);
-    SERIALX.print(F("\r")); // cleaner
-    SERIALX.print(F("sys.date\r")); // Synchronise the current date over ntp
-    vTaskDelay(95000);
-
   }
 }
 
@@ -422,9 +438,7 @@ void setup2(bool ini)
   alarm |= (1 << 15);
   flag_screen[NEWALARM]++;
 
-  //
-
-  
+  //Flags for NTP and IP requests
   isAskingTime = false;
   isAskingIP = false;
   isTimeInvalid = true;
@@ -709,12 +723,14 @@ void parse(char* line)
     hours = (dtl.tm_hour) % 24;
     minutes = dtl.tm_min;
     seconds = dtl.tm_sec;
+    isTimeInvalid = false;
     flag_screen[NEWTIME]++;
   }
 
   if ((ici = strstr(line, "IP: ")) != NULL)
   {
     strcpy(oip, ici + 4);
+    isIPInvalid = false;
   }
 
     //////Volume   ##CLI.VOL#:
