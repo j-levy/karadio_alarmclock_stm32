@@ -358,7 +358,6 @@ static void uartTask(void *pvParameters) {
          SERIALX.print(F("wifi.status\r")); // Synchronise the current state
          isAskingIP = false;
     }
-    
     serial();
     vTaskDelay(1);
   }
