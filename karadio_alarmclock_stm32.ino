@@ -46,6 +46,11 @@ InfoScroll Song = {0, "INIT...", 2, 900};
 
 uint16 alarm;
 
+bool isAskingTime;
+bool isAskingIP;
+bool isTimeInvalid;
+bool isIPInvalid;
+
 // ip
 char oip[20] = "___.___.___.___";
 
@@ -407,7 +412,6 @@ void setup2(bool ini)
 
 
   // Initialize the alarm. First step : hardcoded fixed alarm (like in regular clocks), set to 7h41
-  alarm = 0;
   /*
   alarm |= 1 << 11; // 11th bit : alarm on or off.
   alarm |= 7 << 6;  // bits 6 to 11 : hours
@@ -417,6 +421,15 @@ void setup2(bool ini)
   alarm = 9*60+35;
   alarm |= (1 << 15);
   flag_screen[NEWALARM]++;
+
+  //
+
+  
+  isAskingTime = false;
+  isAskingIP = false;
+  isTimeInvalid = true;
+  isIPInvalid = true;
+
 } // setup()
 
 
