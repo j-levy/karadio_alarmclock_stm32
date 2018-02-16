@@ -373,7 +373,7 @@ static void uartTask(void *pvParameters) {
     if (isAskingIP) {
         SERIALX.print(F("\r")); // cleaner
          SERIALX.print(F("wifi.status\r")); // Synchronise the current state
-         isAskingTime = false;
+         isAskingIP = false;
     }
     
     serial();
@@ -530,10 +530,9 @@ void setup(void) {
   setup2(false);
 
   /// HERE TASKS ARE CREATED (FREERTOS)
-  int s1 = xTaskCreate(mainTask, NULL, configMINIMAL_STACK_SIZE + 250, NULL, tskIDLE_PRIORITY + 2, NULL);
-  int s2 = xTaskCreate(uartTask, NULL, configMINIMAL_STACK_SIZE + 100, NULL, tskIDLE_PRIORITY + 3, NULL);
-  int s3 = xTaskCreate(NTPTask, NULL, configMINIMAL_STACK_SIZE + 100, NULL, tskIDLE_PRIORITY + 10, NULL);
-  //int s4 = xTaskCreate(localTimeTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
+  int s1 = xTaskCreate(mainTask, NULL, configMINIMAL_STACK_SIZE + 500, NULL, tskIDLE_PRIORITY + 2, NULL);
+  int s2 = xTaskCreate(uartTask, NULL, configMINIMAL_STACK_SIZE + 300, NULL, tskIDLE_PRIORITY + 3, NULL);
+  int s3 = pdPASS;
   int s4 = pdPASS;
   int s5 = xTaskCreate(printScrollRTOSTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
   int s6 = xTaskCreate(buttonsPollingTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
