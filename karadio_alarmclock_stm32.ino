@@ -192,7 +192,7 @@ static void printScrollRTOSTask(void *pvParameters) {
 
 
 //-------------------------------------------------------
-// Main task used for display the screen and blink the led
+// Main task used for display the screen
 static void mainTask(void *pvParameters) {
   //Serial.println(F("mainTask"));
   bool alt = true;
@@ -204,34 +204,17 @@ static void mainTask(void *pvParameters) {
     {
       isLCDused = true;
 
-      /*
-        if (flag_screen[TOGGLELIGHT] == 1)
-        {
-        lcd.backlight();
-        flag_screen[TOGGLELIGHT] = 0;
-        }
-        else if (flag_screen[TOGGLELIGHT] == -1)
-        {
-        lcd.noBacklight();
-        flag_screen[TOGGLELIGHT] = 0;
-        }
-      */
 
       // Clean up the whole line
       if (flag_screen[NEWTITLE] == 2)
       {
         lcd.setCursor(0, 0);
         lcd.print("                    ");
-        
-        lcd.setCursor(0, 1);
-        lcd.print("                    ");
         /*
         lcd.setCursor(0, 2);
         lcd.print("                    ");
         */
         // also displays IP here once :
-        lcd.setCursor(0, 1);
-        lcd.print(oip);
         flag_screen[NEWTITLE]--;
       }
       // Clean up the whole line
@@ -301,7 +284,7 @@ static void mainTask(void *pvParameters) {
 static void uartTask(void *pvParameters) {
 
   Serial.println(F("uartTask"));
-  vTaskDelay(1000);
+  vTaskDelay(3000);
   SERIALX.print(F("\r")); // cleaner
   SERIALX.print(F("cli.info\r")); // Synchronise the current state
   while (1) {
@@ -530,12 +513,12 @@ void setup(void) {
   setup2(false);
 
   /// HERE TASKS ARE CREATED (FREERTOS)
-  int s1 = xTaskCreate(mainTask, NULL, configMINIMAL_STACK_SIZE + 500, NULL, tskIDLE_PRIORITY + 2, NULL);
-  int s2 = xTaskCreate(uartTask, NULL, configMINIMAL_STACK_SIZE + 300, NULL, tskIDLE_PRIORITY + 3, NULL);
+  int s1 = xTaskCreate(mainTask, NULL, configMINIMAL_STACK_SIZE + 100, NULL, tskIDLE_PRIORITY + 2, NULL);
+  int s2 = xTaskCreate(uartTask, NULL, configMINIMAL_STACK_SIZE + 600, NULL, tskIDLE_PRIORITY + 3, NULL);
   int s3 = pdPASS;
   int s4 = pdPASS;
-  int s5 = xTaskCreate(printScrollRTOSTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
-  int s6 = xTaskCreate(buttonsPollingTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+  int s5 = xTaskCreate(printScrollRTOSTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+  int s6 = xTaskCreate(buttonsPollingTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
 
   if ( s1 != pdPASS || s2 != pdPASS || s3 != pdPASS || s4 != pdPASS || s5 != pdPASS || s6 != pdPASS) {
     Serial.println(F("Task or Semaphore creation problem.."));
@@ -730,6 +713,13 @@ void parse(char* line)
   {
     strcpy(oip, ici + 4);
     isIPInvalid = false;
+    while(isLCDused);
+    isLCDused = true;
+        lcd.setCursor(0, 1);
+        lcd.print("                    ");
+        lcd.setCursor(0, 1);
+        lcd.print(oip);
+    isLCDused = false;
   }
 
     //////Volume   ##CLI.VOL#:
