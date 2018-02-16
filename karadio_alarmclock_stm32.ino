@@ -46,6 +46,11 @@ InfoScroll Song = {0, "INIT...", 2, 900};
 
 uint16 alarm;
 
+bool isAskingTime;
+bool isAskingIP;
+bool isTimeInvalid;
+bool isIPInvalid;
+
 // ip
 char oip[20] = "___.___.___.___";
 
@@ -102,6 +107,15 @@ void localTime() {
   //Serial.println(seconds);
   seconds++;
   flag_screen[NEWTIME]++; // this makes the : blink
+  
+  // check every second time and IP
+  if (isTimeInvalid) {
+    isAskingTime = true;
+  }
+  if (isIPInvalid) {
+    isAskingIP = true;
+  }
+  
   if (seconds >= 60)
   {
     seconds = 0;
@@ -110,9 +124,13 @@ void localTime() {
     {
       minutes = 0;
       hours++;
+      // ask for NTP time every hour, to avoid derivating.
+      isTimeInvalid = true;
+      
       if (hours >= 24)
       {
         hours = 0;
+
       } //endif (hours)
     } // endif (minutes)
     // check alarm clock.
@@ -345,6 +363,18 @@ static void uartTask(void *pvParameters) {
         flag_command[MODE]--;
         digitalWrite(PC13, LOW);
     }
+
+    if (isAskingTime) {
+        SERIALX.print(F("\r")); // cleaner
+         SERIALX.print(F("sys.date\r")); // Synchronise the current state
+         isAskingTime = false;
+    }
+
+    if (isAskingIP) {
+        SERIALX.print(F("\r")); // cleaner
+         SERIALX.print(F("wifi.status\r")); // Synchronise the current state
+         isAskingIP = false;
+    }
     
     serial();
     vTaskDelay(1);
@@ -358,15 +388,6 @@ static void NTPTask(void *pvParameters) {
   while (1)
   {
     vTaskDelay(5000);
-    SERIALX.print(F("\r")); // cleaner
-    SERIALX.print(F("wifi.status\r")); // Synchronise the current state
-    vTaskDelay(700);
-
-    vTaskDelay(95000);
-    SERIALX.print(F("\r")); // cleaner
-    SERIALX.print(F("sys.date\r")); // Synchronise the current date over ntp
-    vTaskDelay(95000);
-
   }
 }
 
@@ -407,7 +428,6 @@ void setup2(bool ini)
 
 
   // Initialize the alarm. First step : hardcoded fixed alarm (like in regular clocks), set to 7h41
-  alarm = 0;
   /*
   alarm |= 1 << 11; // 11th bit : alarm on or off.
   alarm |= 7 << 6;  // bits 6 to 11 : hours
@@ -417,6 +437,13 @@ void setup2(bool ini)
   alarm = 9*60+35;
   alarm |= (1 << 15);
   flag_screen[NEWALARM]++;
+
+  //Flags for NTP and IP requests
+  isAskingTime = false;
+  isAskingIP = false;
+  isTimeInvalid = true;
+  isIPInvalid = true;
+
 } // setup()
 
 
@@ -503,10 +530,9 @@ void setup(void) {
   setup2(false);
 
   /// HERE TASKS ARE CREATED (FREERTOS)
-  int s1 = xTaskCreate(mainTask, NULL, configMINIMAL_STACK_SIZE + 250, NULL, tskIDLE_PRIORITY + 2, NULL);
-  int s2 = xTaskCreate(uartTask, NULL, configMINIMAL_STACK_SIZE + 100, NULL, tskIDLE_PRIORITY + 3, NULL);
-  int s3 = xTaskCreate(NTPTask, NULL, configMINIMAL_STACK_SIZE + 100, NULL, tskIDLE_PRIORITY + 10, NULL);
-  //int s4 = xTaskCreate(localTimeTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
+  int s1 = xTaskCreate(mainTask, NULL, configMINIMAL_STACK_SIZE + 500, NULL, tskIDLE_PRIORITY + 2, NULL);
+  int s2 = xTaskCreate(uartTask, NULL, configMINIMAL_STACK_SIZE + 300, NULL, tskIDLE_PRIORITY + 3, NULL);
+  int s3 = pdPASS;
   int s4 = pdPASS;
   int s5 = xTaskCreate(printScrollRTOSTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
   int s6 = xTaskCreate(buttonsPollingTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
@@ -696,12 +722,14 @@ void parse(char* line)
     hours = (dtl.tm_hour) % 24;
     minutes = dtl.tm_min;
     seconds = dtl.tm_sec;
+    isTimeInvalid = false;
     flag_screen[NEWTIME]++;
   }
 
   if ((ici = strstr(line, "IP: ")) != NULL)
   {
     strcpy(oip, ici + 4);
+    isIPInvalid = false;
   }
 
     //////Volume   ##CLI.VOL#:
