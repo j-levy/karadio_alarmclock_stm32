@@ -490,6 +490,8 @@ static void buttonsPollingTask(void *pvParameters)
 //Setup all things, check for contrast adjust and show initial page.
 // ######################### SETUP #################################
 void setup(void) {
+
+  delay(5000);
   // To control things, buttons and two-speeds polling.
   pinMode(PC13, OUTPUT);
   digitalWrite(PC13, LOW);
