@@ -1,4 +1,4 @@
-#KaRadio Addon for STM32 with LCD and alarm clock features
+# KaRadio Addon for STM32 with LCD and alarm clock features
 
 ### Description
 
@@ -15,7 +15,7 @@ See more about my project on my blog : https://electronics-kitchen-table.blogspo
 - 6 buttons to control the KaRadio and set alarm clock with common features : Volume +/-, Channel +/-, Play/Pause, and Mode button to set the alarm clock
 - A 20x4 LCD screen to display all relevant information
 - (Coming soon) alarm clock kept in Flash (EEPROM emulation) between reboots
-- (Coming soon) current clock displayed on a separate, 4-digits display
+- (Maybe one day) current clock displayed on a separate, 4-digits display
 - (Maybe one day) Non-ASCII characters fallback mode (currently, non-ASCII characters are replaced by bit shifting and truncate, creating funny symbols).
 
 ### Wiring
