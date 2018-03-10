@@ -4,8 +4,6 @@
 #include <time.h>
 #include <EEPROM.h>
 
-//#include <TM1637Display.h>
-
 /* TIMERS */
 // Hardware timer 2 of the STM32
 // used for all timers in this software

@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "C:\\Users\\Jonathan LEVY\\AppData\\Local\\Arduino15\\packages\\stm32duino\\hardware\\STM32F1\\2018.2.26\\cores\\maple"
+            ],
+            "browse": {
+                "limitSymbolsToIncludedHeaders": false,
+                "path": [
+                    "C:\\Users\\Jonathan LEVY\\AppData\\Local\\Arduino15\\packages\\stm32duino\\hardware\\STM32F1\\2018.2.26\\cores\\maple"
+                ]
+            },
+            "intelliSenseMode": "msvc-x64"
+        }
+    ],
+    "version": 3
+}
