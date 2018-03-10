@@ -42,7 +42,7 @@ struct InfoScroll {
   int waiting;
 };
 
-InfoScroll Song = {0, "INIT...", 2, 900};
+InfoScroll Song = {0, (char*) "INIT...", 2, 900};
 
 uint16 alarm;
 
@@ -416,7 +416,7 @@ void setup2(bool ini)
   alarm |= 41;      // bit 0 to 5 : minutes
   */
   alarm = 0; // initialize all bits to 0 !
-  alarm = 9*60+35;
+  alarm = 13*60+01;
   alarm |= (1 << 15);
   flag_screen[NEWALARM]++;
 
@@ -541,25 +541,8 @@ void removeUtf8(byte *characters)
   int iindex = 0;
   while (characters[iindex])
   {
-    // apparently this if-then-else doesn't work ! Lazy to remove it.
     if ((characters[iindex] >= 0xc2) && (characters[iindex] <= 0xc3)) // only 0 to FF ascii char
     {
-      //      SERIALX.println((characters[iindex]));
-      if (characters[iindex] == 'é' || characters[iindex] == 'è' || characters[iindex] == 'ê' || characters[iindex] == 'ë')
-        characters[iindex] = 'e';
-
-      else if (characters[iindex] == 'à')
-        characters[iindex] = 'a';
-
-      else if (characters[iindex] == 'î' || characters[iindex] == 'ï' || characters[iindex] == 'ì')
-        characters[iindex] = 'i';
-
-      else if (characters[iindex] == 'ù')
-        characters[iindex] = 'u';
-      else if (characters[iindex] == 'ô' || characters[iindex] == 'ö')
-        characters[iindex] = 'o';
-      else
-      {
         characters[iindex + 1] = ((characters[iindex] << 6) & 0xFF) | (characters[iindex + 1] & 0x3F);
         int sind = iindex + 1;
         while (characters[sind]) {
@@ -567,7 +550,6 @@ void removeUtf8(byte *characters)
           sind++;
         }
         characters[sind - 1] = 0;
-      }
     }
     iindex++;
   }
