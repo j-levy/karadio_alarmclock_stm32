@@ -22,8 +22,6 @@ unsigned char seconds;
 char flag_screen[6] = {0};
 
 bool isLight = true;
-bool isUARTused = false;
-bool isLCDused = false;
 bool isPlaying = true;
 bool isMode2ON = false;
 
@@ -54,6 +52,10 @@ bool isIPInvalid;
 // ip
 char oip[20] = "___.___.___.___";
 
+
+xQueueHandle mutexLCD = xSemaphoreCreateMutex();
+xQueueHandle mutexUART = xSemaphoreCreateMutex();
+
 // init timer 2 for irmp led screen etc
 void timer2_init ()
 {
@@ -82,19 +84,7 @@ void TIM2_IRQHandler()     // Timer2 Interrupt Handler
     // Time compute
     localTime();
     timestamp++;  // time update
-
-
-    /*
-      if (state) timein = 0; // only on stop state
-      else timein++;
-      dt=gmtime(&timestamp);
-      if (((timein % DTIDLE)==0)&&(!state)  ) {
-       if ((timein % (30*DTIDLE))==0){ itAskTime=true;timein = 0;} // synchronise with ntp every x*DTIDLE
-       if (stateScreen != stime) {itAskTime=true;itAskStime=true;} // start the time display
-      }
-      if (((dt->tm_sec)==0)&&(stateScreen == stime)) { mTscreen = 1;  }
-
-    */
+    
     // Other slow timers
     timerScreen++;
     timerScroll++;
@@ -158,13 +148,12 @@ static void printScrollRTOSTask(void *pvParameters) {
       for (int k = len - i; k < LCD_WIDTH; k++)
         p_message += " ";
 
-      while (isLCDused); // wait for the LCD to be available.
-
-      // Write that stuff
-      isLCDused = true;
-      lcd.setCursor(0, Song.line);
-      lcd.print(p_message);
-      isLCDused = false;
+      if(xSemaphoreTake(mutexLCD, 10 ) == pdTRUE) // wait for the LCD to be available, ask every 10 ticks
+      {
+        lcd.setCursor(0, Song.line);
+        lcd.print(p_message);
+        xSemaphoreGive(mutexLCD);
+      }
 
       // Wait a bit if it's the first line...
       if (i == 0)
@@ -200,11 +189,8 @@ static void mainTask(void *pvParameters) {
 
     /// HERE ADD SCREEN DRAWING FOR TITLE, STATION, TIME.
     int i = 0;
-    if (!isLCDused) // Critical section ahead : takes over the LCD. "if" so that it can be skipped if anything else happens (not locked)
+    if (xSemaphoreTake(mutexLCD, 10 ) == pdTRUE) // Critical section ahead : takes over the LCD. "if" so that it can be skipped if anything else happens (not locked)
     {
-      isLCDused = true;
-
-
       // Clean up the whole line
       if (flag_screen[NEWTITLE] == 2)
       {
@@ -273,7 +259,7 @@ static void mainTask(void *pvParameters) {
         flag_screen[NEWALARM]--;
       }
    
-      isLCDused = false;
+      xSemaphoreGive(mutexLCD);
     }
     vTaskDelay(FREQ_TASK_SCREEN); // update the screen @5Hz (should be fast enough !)
   }
@@ -285,10 +271,33 @@ static void uartTask(void *pvParameters) {
 
   Serial.println(F("uartTask"));
   vTaskDelay(3000);
-  SERIALX.print(F("\r")); // cleaner
-  SERIALX.print(F("cli.info\r")); // Synchronise the current state
+  if (xSemaphoreTake(mutexUART, 10 ) == pdTRUE)
+  {
+    SERIALX.print(F("\r")); // cleaner
+    SERIALX.print(F("cli.info\r")); // Synchronise the current state
+    xSemaphoreGive(mutexUART);
+  }
+   
   while (1) {
-    // Mode 1 - control the radio.
+
+    // make whole task as critical for UART. It's too much for what's actually needed, but simpler to write.
+    if (xSemaphoreTake(mutexUART, 100 ) == pdTRUE)
+    {
+    // serial reads the UART. it can be inside the mutex take, since it's not called anywhere else.
+    serial();
+    xSemaphoreGive(mutexUART);
+    vTaskDelay(1);
+    } // endif (semaphore)
+  } // endwhile
+}
+
+static void UartSendTask(void *pdParameters)
+{
+
+  vTaskDelay(3000);
+  if (xSemaphoreTake(mutexUART, 10 ) == pdTRUE)
+  {
+  // Mode 1 - control the radio.
     if (flag_command[PLAYPAUSE] + flag_command[VOLPLUS] + flag_command[VOLMINUS] + flag_command[CHANPLUS] + flag_command[CHANMINUS] >= 1)
     {
       const char *cmd;
@@ -314,8 +323,9 @@ static void uartTask(void *pvParameters) {
           cmd = "cli.vol-\r";
           flag_command[VOLMINUS] = 0;
         }
-        SERIALX.print(F("\r")); // cleaner
-        SERIALX.print(F(cmd));
+          SERIALX.print(F("\r")); // cleaner
+          SERIALX.print(F(cmd));
+          
         digitalWrite(PC13, LOW);
       } else { // MODE 2 : ALARM 
         if (flag_command[PLAYPAUSE])
@@ -358,22 +368,11 @@ static void uartTask(void *pvParameters) {
          SERIALX.print(F("wifi.status\r")); // Synchronise the current state
          isAskingIP = false;
     }
-    serial();
-    vTaskDelay(1);
+
+    xSemaphoreGive(mutexUART);
   }
-
+  vTaskDelay(10);
 }
-
-
-static void NTPTask(void *pvParameters) {
-  Serial.println(F("NTPTask"));
-  while (1)
-  {
-    vTaskDelay(5000);
-  }
-}
-
-
 
 ////////////////////////////////////////
 
@@ -410,13 +409,9 @@ void setup2(bool ini)
 
 
   // Initialize the alarm. First step : hardcoded fixed alarm (like in regular clocks), set to 7h41
-  /*
-  alarm |= 1 << 11; // 11th bit : alarm on or off.
-  alarm |= 7 << 6;  // bits 6 to 11 : hours
-  alarm |= 41;      // bit 0 to 5 : minutes
-  */
+  
   alarm = 0; // initialize all bits to 0 !
-  alarm = 9*60+35;
+  alarm = 7*60+41;
   alarm |= (1 << 15);
   flag_screen[NEWALARM]++;
 
@@ -544,22 +539,7 @@ void removeUtf8(byte *characters)
     // apparently this if-then-else doesn't work ! Lazy to remove it.
     if ((characters[iindex] >= 0xc2) && (characters[iindex] <= 0xc3)) // only 0 to FF ascii char
     {
-      //      SERIALX.println((characters[iindex]));
-      if (characters[iindex] == 'é' || characters[iindex] == 'è' || characters[iindex] == 'ê' || characters[iindex] == 'ë')
-        characters[iindex] = 'e';
-
-      else if (characters[iindex] == 'à')
-        characters[iindex] = 'a';
-
-      else if (characters[iindex] == 'î' || characters[iindex] == 'ï' || characters[iindex] == 'ì')
-        characters[iindex] = 'i';
-
-      else if (characters[iindex] == 'ù')
-        characters[iindex] = 'u';
-      else if (characters[iindex] == 'ô' || characters[iindex] == 'ö')
-        characters[iindex] = 'o';
-      else
-      {
+      // need a better understanding here to fix non-ASCII characters.
         characters[iindex + 1] = ((characters[iindex] << 6) & 0xFF) | (characters[iindex + 1] & 0x3F);
         int sind = iindex + 1;
         while (characters[sind]) {
@@ -567,7 +547,6 @@ void removeUtf8(byte *characters)
           sind++;
         }
         characters[sind - 1] = 0;
-      }
     }
     iindex++;
   }
@@ -714,13 +693,14 @@ void parse(char* line)
   {
     strcpy(oip, ici + 4);
     isIPInvalid = false;
-    while(isLCDused);
-    isLCDused = true;
+    if (xSemaphoreTake(mutexLCD, 10) == pdTRUE)
+    {
         lcd.setCursor(0, 1);
         lcd.print("                    ");
         lcd.setCursor(0, 1);
         lcd.print(oip);
-    isLCDused = false;
+        xSemaphoreGive(mutexLCD);
+    }
   }
 
     //////Volume   ##CLI.VOL#:

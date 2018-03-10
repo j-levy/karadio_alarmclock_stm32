@@ -23,11 +23,11 @@
 
 // the LCD screen size
 #define LCD_WIDTH 20
-#define BUFLEN  256
+#define BUFLEN  192
 #define LINES  4
 
 #undef SERIAL_RX_BUFFER_SIZE
-#define SERIAL_RX_BUFFER_SIZE 256
+#define SERIAL_RX_BUFFER_SIZE 192
 #define SERIALX Serial3
 #define PIN_LED LED_BUILTIN
 
