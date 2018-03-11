@@ -12,7 +12,7 @@ char nameset[BUFLEN] = {"0"};
 ; // the local name of the station
 int16_t volume;
 
-volatile char flag_command[6] = {0}; // volatile is for interrupts.
+volatile bool flag_command[6] = {0}; // volatile is for interrupts.
 
 unsigned char hours;
 unsigned char minutes;
@@ -121,7 +121,7 @@ void localTime()
     // check alarm clock.
 
     if (hours == READ_ALARM_HOURS && minutes == READ_ALARM_MINUTES && seconds == 0 && !isPlaying && READ_ALARM_STATE == 1)
-      flag_command[PLAYPAUSE]++; // act as if the play-pause button was pressed !
+      flag_command[PLAYPAUSE]=true; // act as if the play-pause button was pressed !
   } // endif(seconds)
 }
 
@@ -277,7 +277,7 @@ static void uartTask(void *pvParameters)
   while (1)
   {
     // Mode 1 - control the radio.
-    if (flag_command[PLAYPAUSE] + flag_command[VOLPLUS] + flag_command[VOLMINUS] + flag_command[CHANPLUS] + flag_command[CHANMINUS] >= 1)
+    if (flag_command[PLAYPAUSE] || flag_command[VOLPLUS] || flag_command[VOLMINUS] || flag_command[CHANPLUS] || flag_command[CHANMINUS])
     {
       const char *cmd;
       cmd = (const char *)malloc(20 * sizeof(char));
@@ -288,27 +288,27 @@ static void uartTask(void *pvParameters)
         {
           cmd = (!isPlaying ? "cli.start\r" : "cli.stop\r");
           isPlaying = !isPlaying;
-          flag_command[PLAYPAUSE] = 0;
+          flag_command[PLAYPAUSE] = false;
         }
         else if (flag_command[CHANPLUS])
         {
           cmd = "cli.next\r";
-          flag_command[CHANPLUS] = 0;
+          flag_command[CHANPLUS] = false;
         }
         else if (flag_command[CHANMINUS])
         {
           cmd = "cli.prev\r";
-          flag_command[CHANMINUS] = 0;
+          flag_command[CHANMINUS] = false;
         }
         else if (flag_command[VOLPLUS])
         {
           cmd = "cli.vol+\r";
-          flag_command[VOLPLUS] = 0;
+          flag_command[VOLPLUS] = false;
         }
         else if (flag_command[VOLMINUS])
         {
           cmd = "cli.vol-\r";
-          flag_command[VOLMINUS] = 0;
+          flag_command[VOLMINUS] = false;
         }
         SERIALX.print(F("\r")); // cleaner
         SERIALX.print(F(cmd));
@@ -319,27 +319,27 @@ static void uartTask(void *pvParameters)
         if (flag_command[PLAYPAUSE])
         {
           FLIP_ALARM_STATE;
-          flag_command[PLAYPAUSE] = 0;
+          flag_command[PLAYPAUSE] = false;
         }
         else if (flag_command[CHANPLUS])
         {
           alarm = CHANGE_ALARM(1, 0);
-          flag_command[CHANPLUS] = 0;
+          flag_command[CHANPLUS] = false;
         }
         else if (flag_command[CHANMINUS])
         {
           alarm = CHANGE_ALARM(-1, 0);
-          flag_command[CHANMINUS] = 0;
+          flag_command[CHANMINUS] = false;
         }
         else if (flag_command[VOLPLUS])
         {
           alarm = CHANGE_ALARM(0, 1);
-          flag_command[VOLPLUS] = 0;
+          flag_command[VOLPLUS] = false;
         }
         else if (flag_command[VOLMINUS])
         {
           alarm = CHANGE_ALARM(0, -1);
-          flag_command[VOLMINUS] = 0;
+          flag_command[VOLMINUS] = false;
         }
         flag_screen[NEWALARM]=true;
         digitalWrite(PC13, LOW);
@@ -350,7 +350,7 @@ static void uartTask(void *pvParameters)
     {
       isMode2ON = !isMode2ON;
       flag_screen[NEWALARM]=true;
-      flag_command[MODE]--;
+      flag_command[MODE]=false;
       digitalWrite(PC13, LOW);
     }
 
@@ -400,7 +400,7 @@ static void buttonsPollingTask(void *pvParameters)
     for (int i = 0; i < 6; i++)
     {
       // if we start pushing on it
-      if (button[i] < 5 && prev_button[i] != button[i] && flag_command[i] == 0)
+      if (button[i] < 5 && prev_button[i] != button[i] && flag_command[i] == false)
       {
         // Fill a counter... When the counter is full, take action !
         polling = FAST_POLLING;
@@ -409,7 +409,7 @@ static void buttonsPollingTask(void *pvParameters)
         {
           count[i] = 0;
           prev_button[i] = button[i];
-          flag_command[i] = 1;
+          flag_command[i] = true;
           // The delay and the DigitalWrite on PC13 is for debug. PC13 is BUILTIN_LED.
           vTaskDelay(20);
           digitalWrite(PC13, HIGH);
