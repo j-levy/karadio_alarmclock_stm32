@@ -54,6 +54,13 @@ bool isTimeInvalid;
 // ip
 char oip[20] = "___.___.___.___";
 
+// EEPROM configuration
+
+
+uint16 AddressWrite = 0x00; // write at the beginning of the page.
+#define DEBUG
+
+
 // init timer 2 for irmp led screen etc
 void timer2_init()
 {
@@ -299,12 +306,12 @@ static void uartTask(void *pvParameters)
         }
         else if (flag_command[CHANPLUS])
         {
-          cmd = "cli.next\r";
+          cmd = "cli.prev\r";
           flag_command[CHANPLUS] = false;
         }
         else if (flag_command[CHANMINUS])
         {
-          cmd = "cli.prev\r";
+          cmd = "cli.next\r";
           flag_command[CHANMINUS] = false;
         }
         else if (flag_command[VOLPLUS])
@@ -355,6 +362,18 @@ static void uartTask(void *pvParameters)
 
     if (flag_command[MODE])
     {
+      // at mode change, save the alarm in EEPROM.
+      uint16 Status;
+      Status = EEPROM.write(AddressWrite, alarm);
+      #ifdef DEBUG
+        Serial.print("EEPROM.write(0x");
+        Serial.print(AddressWrite, HEX);
+        Serial.print(", 0x");
+        Serial.print(alarm, HEX);
+        Serial.print(") : Status : ");
+        Serial.println(Status, HEX);
+      #endif
+
       isMode2ON = !isMode2ON;
       flag_screen[NEWALARM]=true;
       flag_command[MODE]=false;
@@ -367,7 +386,8 @@ static void uartTask(void *pvParameters)
       SERIALX.print(F("sys.date\r")); // Synchronise the current state
       isAskingTime = false;
       //vTaskDelay(500); // leave time to answer. This is exceptionnal (startup and once every hour)
-    } else if (isAskingIP) // asking two things can't get them processed.
+    } 
+    if (isAskingIP) // asking two things can't get them processed.
     {
       SERIALX.print(F("\r"));            // cleaner
       SERIALX.print(F("wifi.status\r")); // Synchronise the current state
@@ -502,6 +522,28 @@ void setup(void)
 
   // set the pointer to the title... this is kinda dumb because it only needs to be done once...
   Song.s_connect = title;
+
+
+  // ######################### EEPROM INIT ####################################
+  uint16 Status;
+  EEPROM.PageBase0 = 0x801F000;
+  EEPROM.PageBase1 = 0x801F800; // 2 pages, may be reduced to 1 later...
+  EEPROM.PageSize  = 0x400;
+
+  Status = EEPROM.init();
+  Serial.print("EEPROM.init() : ");
+  Serial.println(Status, HEX);
+  Serial.println();
+
+  Status = EEPROM.read(AddressWrite, &alarm);
+  #ifdef DEBUG
+    Serial.print("EEPROM.read(0x");
+    Serial.print(AddressWrite, HEX);
+    Serial.print(", &..) = 0x");
+    Serial.print(alarm, HEX);
+    Serial.print(" : Status : ");
+    Serial.println(Status, HEX);
+  #endif
 
   // ######################### FREERTOS TASKS #################################
   int s1 = xTaskCreate(mainTask, NULL, configMINIMAL_STACK_SIZE + 100, NULL, tskIDLE_PRIORITY + 2, NULL);
