@@ -43,12 +43,15 @@
 #define MODE 5
 
 // FLAG_SCREEN
-#define NEWTITLE   0
-#define NEWSTATION 1
-#define NEWTIME 2
-#define TOGGLELIGHT 3
-#define NEWVOLUME 4
-#define NEWALARM 5
+#define NEWTITLE1   0
+#define NEWTITLE2  1
+#define NEWSTATION 2
+#define NEWTIME 3
+#define TOGGLELIGHT 4
+#define NEWVOLUME 5
+#define NEWVOLUMEDONE 6
+#define NEWALARM 7
+#define NEWIP 8
 
 // 
 #define FREQ_TASK_SCREEN 200
