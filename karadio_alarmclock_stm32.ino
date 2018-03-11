@@ -240,14 +240,19 @@ static void mainTask(void *pvParameters)
       {
 		lcd.setCursor(10, 2);
         lcd.print(String((round(((float)volume) * 100 / 254) < 10 ? "  " : ((round(((float)volume) * 100 / 254) < 100 ? " " : "")))) + String("VOL : ") + String(round(((float)volume) * 100 / 254)) + "%");
-        volumeCounter = 3; //seconds to be displayed. Actually, will be between 2 and 3 seconds.
+        volumeCounter = 2; //seconds to be displayed. Actually, will be between 2 and 3 seconds.
         flag_screen[NEWVOLUME]=false;
       }
 
       if (flag_screen[NEWALARM])
       {
         lcd.setCursor(0, 2);
-        lcd.print((isMode2ON ? "     >" : "") + String(READ_ALARM_HOURS) + ":" + String(READ_ALARM_MINUTES) + (READ_ALARM_STATE == 1 ? " ON " : " OFF") + (!isMode2ON ? "      " : ""));
+        lcd.print((isMode2ON ? "     >" : "") \
+					+ (READ_ALARM_HOURS < 10 ? "0":"") + String(READ_ALARM_HOURS) \
+					+ ":" \
+					+ (READ_ALARM_MINUTES < 10 ? "0":"") + String(READ_ALARM_MINUTES) \
+					+ (READ_ALARM_STATE == 1 ? " ON " : " OFF") \
+					+ (!isMode2ON ? "      " : ""));
         flag_screen[NEWALARM]=false;
       }
       if (flag_screen[NEWIP])
