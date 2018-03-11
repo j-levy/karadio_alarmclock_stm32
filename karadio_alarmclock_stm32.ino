@@ -363,17 +363,19 @@ static void uartTask(void *pvParameters)
     if (flag_command[MODE])
     {
       // at mode change, save the alarm in EEPROM.
-      uint16 Status;
-      Status = EEPROM.write(AddressWrite, alarm);
-      #ifdef DEBUG
-        Serial.print("EEPROM.write(0x");
-        Serial.print(AddressWrite, HEX);
-        Serial.print(", 0x");
-        Serial.print(alarm, HEX);
-        Serial.print(") : Status : ");
-        Serial.println(Status, HEX);
-      #endif
-
+      if (isMode2ON)
+      {
+        uint16 Status;
+        Status = EEPROM.write(AddressWrite, alarm);
+        #ifdef DEBUG
+          Serial.print("EEPROM.write(0x");
+          Serial.print(AddressWrite, HEX);
+          Serial.print(", 0x");
+          Serial.print(alarm, HEX);
+          Serial.print(") : Status : ");
+          Serial.println(Status, HEX);
+        #endif
+      }
       isMode2ON = !isMode2ON;
       flag_screen[NEWALARM]=true;
       flag_command[MODE]=false;
