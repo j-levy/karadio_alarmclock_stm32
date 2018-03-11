@@ -48,6 +48,7 @@ uint16 alarm;
 
 bool isAskingTime;
 bool isAskingIP;
+bool isIPInvalid;
 bool isTimeInvalid;
 
 // ip
@@ -93,6 +94,12 @@ void localTime()
 	volumeCounter--;
   if (volumeCounter==0)
 	flag_screen[NEWVOLUMEDONE]=true;
+	
+  if (isTimeInvalid)
+    isAskingTime = true;
+  
+  if (isIPInvalid)
+    isAskingIP = true;
   
   if (seconds >= 60)
   {
@@ -100,11 +107,7 @@ void localTime()
     minutes++;
     // every minute, check if time is invalid, to ask for NTP.
     // Anyway, NTP cannot process a request every second !!
-    if (isTimeInvalid)
-    {
-      isAskingTime = true;
-    }
-    
+      
     if (minutes >= 60)
     {
       minutes = 0;
@@ -217,19 +220,17 @@ static void mainTask(void *pvParameters)
         // the 'alt' thing is to alternate the blinking for ':'
         if (alt)
         {
-          lcd.print(String(hours) + ":" + (minutes <= 9 ? "0" : "") + String(minutes));
+          lcd.print((hours <= 9 ? "0" : "") + String(hours) + ":" + (minutes <= 9 ? "0" : "") + String(minutes));
           alt = !alt;
         }
         else
         {
-          lcd.print(String(hours) + " " + (minutes <= 9 ? "0" : "") + String(minutes));
+          lcd.print((hours <= 9 ? "0" : "") + String(hours) + " " + (minutes <= 9 ? "0" : "") + String(minutes));
           alt = !alt;
         }
         flag_screen[NEWTIME]=false;
       }
-	  /// TODO : REWORK FLAG HERE (USE USUAL TIMER PROBABLY)
-	  /// WARNING HERE
-	  /// WARNING HERE
+      
       if (flag_screen[NEWVOLUMEDONE])
       {
         lcd.setCursor(10, 2);
@@ -248,13 +249,14 @@ static void mainTask(void *pvParameters)
       {
         lcd.setCursor(0, 2);
         lcd.print((isMode2ON ? "     >" : "") \
-					+ (READ_ALARM_HOURS < 10 ? "0":"") + String(READ_ALARM_HOURS) \
+					+ String((READ_ALARM_HOURS <= 9 ? "0" : "")) + String(READ_ALARM_HOURS) \
 					+ ":" \
-					+ (READ_ALARM_MINUTES < 10 ? "0":"") + String(READ_ALARM_MINUTES) \
+					+ String((READ_ALARM_MINUTES <= 9 ? "0" : "")) + String(READ_ALARM_MINUTES) \
 					+ (READ_ALARM_STATE == 1 ? " ON " : " OFF") \
 					+ (!isMode2ON ? "      " : ""));
         flag_screen[NEWALARM]=false;
       }
+      
       if (flag_screen[NEWIP])
       {
 		lcd.setCursor(0, 1);
@@ -363,18 +365,16 @@ static void uartTask(void *pvParameters)
     {
       SERIALX.print(F("\r"));         // cleaner
       SERIALX.print(F("sys.date\r")); // Synchronise the current state
-      vTaskDelay(300); // leave time to answer. This is exceptionnal (startup and once every hour)
       isAskingTime = false;
-      
-    }
-
-    if (isAskingIP)
+      //vTaskDelay(500); // leave time to answer. This is exceptionnal (startup and once every hour)
+    } else if (isAskingIP) // asking two things can't get them processed.
     {
       SERIALX.print(F("\r"));            // cleaner
       SERIALX.print(F("wifi.status\r")); // Synchronise the current state
-      vTaskDelay(300); // leave time to answer. This only happens once.
       isAskingIP = false;
+      //vTaskDelay(500); // leave time to answer. This only happens until it has an answer.
     }
+    
     serial();
     vTaskDelay(1);
   }
@@ -478,13 +478,9 @@ void setup(void)
   Serial.print(error);
 
   if (error == 0)
-  {
     Serial.println(": LCD found.");
-  }
   else
-  {
     Serial.println(": LCD not found.");
-  }
 
   lcd.begin(20, 4); // initialize the lcd
   lcd.backlight();
@@ -495,13 +491,14 @@ void setup(void)
   alarm = 0; // initialize all bits to 0 beforehand!
   alarm = 7 * 60 + 21;
   alarm |= (1 << 15);
-  flag_screen[NEWALARM]++;
+  flag_screen[NEWALARM]=true;
 
   // ######################### FLAGS NTP / IP #################################
   //Flags for NTP and IP requests
-  isAskingTime = false;
+  isAskingTime = true;
   isAskingIP = true;
   isTimeInvalid = true;
+  isIPInvalid = true;
 
   // set the pointer to the title... this is kinda dumb because it only needs to be done once...
   Song.s_connect = title;
@@ -618,6 +615,7 @@ void parse(char *line)
     hours = (dtl.tm_hour) % 24;
     minutes = dtl.tm_min;
     seconds = dtl.tm_sec;
+    isAskingTime = false;
     isTimeInvalid = false;
     flag_screen[NEWTIME]=true;
   }
@@ -625,6 +623,7 @@ void parse(char *line)
   if ((ici = strstr(line, "IP: ")) != NULL)
   {
     strcpy(oip, ici + 4);
+    isIPInvalid = false;
     isAskingIP = false;
 	flag_screen[NEWIP]=true;
   }
