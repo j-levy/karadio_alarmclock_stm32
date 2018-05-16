@@ -61,6 +61,7 @@ uint16 AddressWrite = 0x00; // write at the beginning of the page.
 
 // a handle to enable/disable scrolling task
 TaskHandle_t xHandlePrintScroll = NULL;
+TaskHandle_t xHandleMain = NULL;
 
 #define DEBUG
 
@@ -168,8 +169,10 @@ static void printScrollRTOSTask(void *pvParameters)
 
       // Write that stuff
       isLCDused = true;
+      vTaskSuspend(xHandleMain);
       lcd.setCursor(0, Song.line);
       lcd.print(p_message);
+      vTaskResume(xHandleMain);
       isLCDused = false;
 
       // Wait a bit if it's the first line...
@@ -211,7 +214,9 @@ static void mainTask(void *pvParameters)
     int i = 0;
     if (!isLCDused) // Critical section ahead : takes over the LCD. "if" so that it can be skipped if anything else happens (not locked)
     {
+      
       isLCDused = true;
+      
 
       // Clean up the whole line
       if (flag_screen[NEWTITLE1])
@@ -574,7 +579,7 @@ void setup(void)
   strcpy(printScrollName, "printScroll");
   printScrollName[11] = 0;
   //
-  int s1 = xTaskCreate(mainTask, NULL , configMINIMAL_STACK_SIZE + 100, NULL, tskIDLE_PRIORITY + 2, NULL);
+  int s1 = xTaskCreate(mainTask, NULL , configMINIMAL_STACK_SIZE + 100, NULL, tskIDLE_PRIORITY + 2, &xHandleMain);
   int s2 = xTaskCreate(uartTask, NULL, configMINIMAL_STACK_SIZE + 600, NULL, tskIDLE_PRIORITY + 3, NULL);
   int s3 = pdPASS;
   int s4 = pdPASS;
@@ -663,10 +668,12 @@ void parse(char *line)
     if (state==true)
     {
       vTaskSuspend(xHandlePrintScroll); // relieve the CPU by disabling one hell of a task.
+      /*
         UART_using_flag_command[PLAYPAUSE] = false;
         UART_using_flag_command[CHANPLUS] = false;
         UART_using_flag_command[CHANMINUS] = false;
-      state = true;
+      */
+      state = false;
     }
     flag_screen[NEWTITLE1] = true;
   }
@@ -676,9 +683,11 @@ void parse(char *line)
     if (state==false)
     {
         vTaskResume(xHandlePrintScroll); // start back the scrlling
+        /*
         UART_using_flag_command[PLAYPAUSE] = false;
         UART_using_flag_command[CHANPLUS] = false;
         UART_using_flag_command[CHANMINUS] = false;
+        */
       state = true;
     }
   }
