@@ -13,6 +13,7 @@ char nameset[BUFLEN] = {"0"};
 int16_t volume;
 
 volatile bool flag_command[6] = {0}; // volatile is for interrupts.
+bool UART_using_flag_command[6] = {0}; // volatile is for interrupts.
 
 unsigned char hours;
 unsigned char minutes;
@@ -55,9 +56,12 @@ bool isTimeInvalid;
 char oip[20] = "___.___.___.___";
 
 // EEPROM configuration
-
-
 uint16 AddressWrite = 0x00; // write at the beginning of the page.
+
+
+// a handle to enable/disable scrolling task
+TaskHandle_t xHandlePrintScroll = NULL;
+
 #define DEBUG
 
 
@@ -87,6 +91,7 @@ void TIM2_IRQHandler() // Timer2 Interrupt Handler
     
     // Count the time (+1 second).
     localTime();
+    //Serial.println(seconds);
   }
 }
 
@@ -98,15 +103,11 @@ void localTime()
   flag_screen[NEWTIME]=true; // this makes the ":" blink
   
   if (volumeCounter>=0)
-	volumeCounter--;
+	  volumeCounter--;
   if (volumeCounter==0)
-	flag_screen[NEWVOLUMEDONE]=true;
+	  flag_screen[NEWVOLUMEDONE]=true;
 	
-  if (isTimeInvalid)
-    isAskingTime = true;
-  
-  if (isIPInvalid)
-    isAskingIP = true;
+
   
   if (seconds >= 60)
   {
@@ -114,6 +115,11 @@ void localTime()
     minutes++;
     // every minute, check if time is invalid, to ask for NTP.
     // Anyway, NTP cannot process a request every second !!
+      if (isTimeInvalid)
+    isAskingTime = true;
+  
+    if (isIPInvalid)
+      isAskingIP = true;
       
     if (minutes >= 60)
     {
@@ -135,6 +141,9 @@ void localTime()
   } // endif(seconds)
 }
 
+
+/// TODO : something is probably making the screen crash here. 
+/// When crashing, only the title is not yet displayed. Then, my suspect is the title scroller task.
 static void printScrollRTOSTask(void *pvParameters)
 {
   while (1)
@@ -182,6 +191,9 @@ static void printScrollRTOSTask(void *pvParameters)
       {
         finished = true;
         flag_screen[NEWTITLE2]=false; // remember, we have to update 2 different locations. First is, when we CLEAN UP the whole line, Second is here.
+        UART_using_flag_command[PLAYPAUSE] = false;
+        UART_using_flag_command[CHANPLUS] = false;
+        UART_using_flag_command[CHANMINUS] = false;
       }
     } // endwhile(!finished)
   }   // endwhile(1)
@@ -195,7 +207,6 @@ static void mainTask(void *pvParameters)
   bool alt = true;
   while (1)
   {
-
     /// HERE ADD SCREEN DRAWING FOR TITLE, STATION, TIME.
     int i = 0;
     if (!isLCDused) // Critical section ahead : takes over the LCD. "if" so that it can be skipped if anything else happens (not locked)
@@ -208,7 +219,7 @@ static void mainTask(void *pvParameters)
         lcd.setCursor(0, 0);
         lcd.print("                    ");
         flag_screen[NEWTITLE1]=false;
-        flag_screen[NEWTITLE2]=true;
+        flag_screen[NEWTITLE2]=true;        
       }
       // Clean up the whole line
       if (flag_screen[NEWSTATION])
@@ -250,6 +261,8 @@ static void mainTask(void *pvParameters)
         lcd.print(String((round(((float)volume) * 100 / 254) < 10 ? "  " : ((round(((float)volume) * 100 / 254) < 100 ? " " : "")))) + String("VOL : ") + String(round(((float)volume) * 100 / 254)) + "%");
         volumeCounter = 2; //seconds to be displayed. Actually, will be between 2 and 3 seconds.
         flag_screen[NEWVOLUME]=false;
+        UART_using_flag_command[VOLPLUS] = false;
+        UART_using_flag_command[VOLMINUS] = false;
       }
 
       if (flag_screen[NEWALARM])
@@ -266,12 +279,12 @@ static void mainTask(void *pvParameters)
       
       if (flag_screen[NEWIP])
       {
-		lcd.setCursor(0, 1);
-		lcd.print("                    ");
-		lcd.setCursor(0, 1);
-		lcd.print(oip);
-		flag_screen[NEWIP]=false;
-	  }
+        lcd.setCursor(0, 1);
+        lcd.print("                    ");
+        lcd.setCursor(0, 1);
+        lcd.print(oip);
+        flag_screen[NEWIP]=false;
+	    }
 
 
       isLCDused = false;
@@ -288,47 +301,52 @@ static void uartTask(void *pvParameters)
   Serial.println(F("uartTask"));
   SERIALX.print(F("\r"));         // cleaner
   SERIALX.print(F("cli.info\r")); // Synchronise the current state
+  vTaskDelay(1000);
   while (1)
   {
     // Mode 1 - control the radio.
-    if (flag_command[PLAYPAUSE] || flag_command[VOLPLUS] || flag_command[VOLMINUS] || flag_command[CHANPLUS] || flag_command[CHANMINUS])
+    if ((flag_command[PLAYPAUSE] || flag_command[VOLPLUS] || flag_command[VOLMINUS] || flag_command[CHANPLUS] || flag_command[CHANMINUS]))
     {
-      const char *cmd;
-      cmd = (const char *)malloc(20 * sizeof(char));
-
-      if (!isMode2ON)
+      if (!isMode2ON && !(UART_USED))
       {
+        char cmd[20];
+
         if (flag_command[PLAYPAUSE])
         {
-          cmd = (!isPlaying ? "cli.start\r" : "cli.stop\r");
+          strcpy(cmd,(!isPlaying ? "cli.start\r" : "cli.stop\r"));
           isPlaying = !isPlaying;
           flag_command[PLAYPAUSE] = false;
+          UART_using_flag_command[PLAYPAUSE] = true;
         }
         else if (flag_command[CHANPLUS])
         {
-          cmd = "cli.prev\r";
+          strcpy(cmd, "cli.prev\r");
           flag_command[CHANPLUS] = false;
+          UART_using_flag_command[CHANPLUS] = true;
         }
         else if (flag_command[CHANMINUS])
         {
-          cmd = "cli.next\r";
+          strcpy(cmd, "cli.next\r");
           flag_command[CHANMINUS] = false;
+          UART_using_flag_command[CHANMINUS] = true;
         }
         else if (flag_command[VOLPLUS])
         {
-          cmd = "cli.vol+\r";
+          strcpy(cmd,"cli.vol+\r");
           flag_command[VOLPLUS] = false;
+          UART_using_flag_command[VOLPLUS] = true;
         }
         else if (flag_command[VOLMINUS])
         {
-          cmd = "cli.vol-\r";
+          strcpy(cmd,"cli.vol-\r");
           flag_command[VOLMINUS] = false;
+          UART_using_flag_command[VOLMINUS] = true;
         }
         SERIALX.print(F("\r")); // cleaner
         SERIALX.print(F(cmd));
         digitalWrite(PC13, LOW);
       }
-      else
+      else if (isMode2ON)
       { // MODE 2 : ALARM
         if (flag_command[PLAYPAUSE])
         {
@@ -358,6 +376,7 @@ static void uartTask(void *pvParameters)
         flag_screen[NEWALARM]=true;
         digitalWrite(PC13, LOW);
       }
+      
     }
 
     if (flag_command[MODE])
@@ -376,6 +395,7 @@ static void uartTask(void *pvParameters)
           Serial.println(Status, HEX);
         #endif
       }
+      
       isMode2ON = !isMode2ON;
       flag_screen[NEWALARM]=true;
       flag_command[MODE]=false;
@@ -398,7 +418,7 @@ static void uartTask(void *pvParameters)
     }
     
     serial();
-    vTaskDelay(1);
+    vTaskDelay(2); // run @500Hz, should be fast enough, but will reduce CPU use.
   }
 }
 
@@ -440,7 +460,6 @@ static void buttonsPollingTask(void *pvParameters)
           // The delay and the DigitalWrite on PC13 is for debug. PC13 is BUILTIN_LED.
           vTaskDelay(20);
           digitalWrite(PC13, HIGH);
-
           polling = SLOW_POLLING; //ms. Reset polling frequency to something slower.
         }
         // if we release it
@@ -525,7 +544,6 @@ void setup(void)
   // set the pointer to the title... this is kinda dumb because it only needs to be done once...
   Song.s_connect = title;
 
-
   // ######################### EEPROM INIT ####################################
   uint16 Status;
   EEPROM.PageBase0 = 0x801F000;
@@ -547,12 +565,20 @@ void setup(void)
     Serial.println(Status, HEX);
   #endif
 
+
+
   // ######################### FREERTOS TASKS #################################
-  int s1 = xTaskCreate(mainTask, NULL, configMINIMAL_STACK_SIZE + 100, NULL, tskIDLE_PRIORITY + 2, NULL);
+  // names
+  char* printScrollName = NULL;
+  printScrollName = (char*) malloc(15*sizeof(char));
+  strcpy(printScrollName, "printScroll");
+  printScrollName[11] = 0;
+  //
+  int s1 = xTaskCreate(mainTask, NULL , configMINIMAL_STACK_SIZE + 100, NULL, tskIDLE_PRIORITY + 2, NULL);
   int s2 = xTaskCreate(uartTask, NULL, configMINIMAL_STACK_SIZE + 600, NULL, tskIDLE_PRIORITY + 3, NULL);
   int s3 = pdPASS;
   int s4 = pdPASS;
-  int s5 = xTaskCreate(printScrollRTOSTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+  int s5 = xTaskCreate(printScrollRTOSTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, &xHandlePrintScroll);
   int s6 = xTaskCreate(buttonsPollingTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
 
   if (s1 != pdPASS || s2 != pdPASS || s3 != pdPASS || s4 != pdPASS || s5 != pdPASS || s6 != pdPASS)
@@ -604,8 +630,7 @@ void parse(char *line)
   //////  reset of the esp
   if ((ici = strstr(line, "VS Version")) != NULL)
   {
-    ///clearAll();
-    ///setup2(true);
+    setup();
   }
   else
       ////// Meta title   ##CLI.META#:
@@ -631,15 +656,31 @@ void parse(char *line)
   }
   else if ((ici = strstr(line, "STOPPED#")) != NULL)  ///// STOPPED  ##CLI.STOPPED#
   {
-    state = false;
+
     ///  cleartitle(3);
     strcpy(title, "STOPPED");
     lcd.noBacklight();
+    if (state==true)
+    {
+      vTaskSuspend(xHandlePrintScroll); // relieve the CPU by disabling one hell of a task.
+        UART_using_flag_command[PLAYPAUSE] = false;
+        UART_using_flag_command[CHANPLUS] = false;
+        UART_using_flag_command[CHANMINUS] = false;
+      state = true;
+    }
     flag_screen[NEWTITLE1] = true;
   }
   else if ((ici = strstr(line, "YING#")) != NULL)
   {
     lcd.backlight();
+    if (state==false)
+    {
+        vTaskResume(xHandlePrintScroll); // start back the scrlling
+        UART_using_flag_command[PLAYPAUSE] = false;
+        UART_using_flag_command[CHANPLUS] = false;
+        UART_using_flag_command[CHANMINUS] = false;
+      state = true;
+    }
   }
   //////Date Time  ##SYS.DATE#: 2017-04-12T21:07:59+01:00
 
@@ -677,7 +718,6 @@ void parse(char *line)
   {
     volume = atoi(ici + 6);
     flag_screen[NEWVOLUME] = true; 
-    //(1000 / FREQ_TASK_SCREEN) * 3; // 3*(200ms * 5) = 3 seconds
   }
 }
 

@@ -2,5 +2,5 @@
     "board": "stm32duino:STM32F1:genericSTM32F103C",
     "configuration": "device_variant=STM32F103CB,upload_method=DFUUploadMethod,cpu_speed=speed_48mhz,opt=osstd",
     "sketch": "karadio_alarmclock_stm32.ino",
-    "port": "COM3"
+    "port": "COM4"
 }
