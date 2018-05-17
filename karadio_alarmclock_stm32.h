@@ -10,7 +10,7 @@
 // Hardware timer 2 of the STM32
 // used for all timers in this software
 #ifndef F_INTERRUPTS
-#define F_INTERRUPTS     15000   // interrupts per second, min: 10000, max: 20000, typ: 15000
+#define F_INTERRUPTS     10000   // interrupts per second, min: 10000, max: 20000, typ: 15000
 #endif
 
 /*  DEFINES   */
@@ -23,11 +23,11 @@
 
 // the LCD screen size
 #define LCD_WIDTH 20
-#define BUFLEN  256
+#define BUFLEN  128
 #define LINES  4
 
 #undef SERIAL_RX_BUFFER_SIZE
-#define SERIAL_RX_BUFFER_SIZE 256
+#define SERIAL_RX_BUFFER_SIZE 512
 #define SERIALX Serial3
 #define PIN_LED LED_BUILTIN
 
@@ -63,7 +63,14 @@
 #define INCLUDE_vTaskSuspend 1
 
 #undef configUSE_PREEMPTION
-#define configUSE_PREEMPTION 1
+#define configUSE_PREEMPTION 0
+
+/*
+#ifdef configGENERATE_RUN_TIME_STATS
+#undef configGENERATE_RUN_TIME_STATS
+#define configGENERATE_RUN_TIME_STATS 1
+#endif
+*/
 /*
 #undef configTICK_RATE_HZ
 #define configTICK_RATE_HZ 100
@@ -83,3 +90,4 @@
 #define CHANGE_ALARM(h,m)    ((alarm & 1<<15) & 1<<15) | \
                               (((((alarm & 0b111111111111) / 60 + h + (((alarm & 0b111111111111) / 60 + h) < 0 ? 24 : 0)) %24) * 60) \
                               + ((((alarm & 0b111111111111) % 60) + m + ((((alarm & 0b111111111111) % 60) + m) < 60 ? 60 : 0))%60))
+

@@ -499,7 +499,7 @@ void setup(void)
   // To control things, buttons and two-speeds polling.
   pinMode(PC13, OUTPUT);
   digitalWrite(PC13, LOW);
-  //PA6 pullup cramée? elle pull down seulement :(
+  //PA6 pullup cramÃ©e? elle pull down seulement :(
   //GPIOA->regs->PUPDR |= & (1<<6); // read PA6
   gpio_init(GPIOA);
   for (int i = 1; i <= 15; i++)
@@ -667,12 +667,12 @@ void parse(char *line)
     lcd.noBacklight();
     if (state==true)
     {
-      vTaskSuspend(xHandlePrintScroll); // relieve the CPU by disabling one hell of a task.
-      /*
+      vTaskSuspend(xHandlePrintScroll); // relieve the CPU by disabling one useless task.
+      
         UART_using_flag_command[PLAYPAUSE] = false;
         UART_using_flag_command[CHANPLUS] = false;
         UART_using_flag_command[CHANMINUS] = false;
-      */
+      
       state = false;
     }
     flag_screen[NEWTITLE1] = true;
@@ -683,11 +683,11 @@ void parse(char *line)
     if (state==false)
     {
         vTaskResume(xHandlePrintScroll); // start back the scrlling
-        /*
+        
         UART_using_flag_command[PLAYPAUSE] = false;
         UART_using_flag_command[CHANPLUS] = false;
         UART_using_flag_command[CHANMINUS] = false;
-        */
+        
       state = true;
     }
   }
@@ -767,3 +767,4 @@ void serial()
 void loop()
 {
 } // loop() UNUSED WITH FREERTOS
+
