@@ -6,6 +6,7 @@
 #include <time.h>
 #include <EEPROM.h>
 
+
 /* TIMERS */
 // Hardware timer 2 of the STM32
 // used for all timers in this software
@@ -32,9 +33,15 @@
 #define PIN_LED LED_BUILTIN
 
 // adaptative polling times (ms) for buttons, and macro for reading values
-#define FAST_POLLING 2
-#define SLOW_POLLING 63
+// Buttons are polled @100Hz when inactive 
+#define SLOW_POLLING 10
+// Buttons are polled @1000Hz when active
+#define FAST_POLLING 1
+// Records 15 polls (lasting 15 ms then) before taking action
+#define POLLCOUNTER 15
+
 #define READPORTA(n) (GPIOA->regs->IDR & (1 << (6+n)))
+#define NBR_BUTTONS 6
 
 // FLAG_BUTTONS
 #define PLAYPAUSE 0
