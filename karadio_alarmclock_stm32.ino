@@ -10,7 +10,8 @@ char station[BUFLEN];             //received station
 char title[BUFLEN];               // received title
 char nameset[BUFLEN] = {"0"};
 ; // the local name of the station
-int16_t volume;
+uint8_t volume;
+uint8_t dispvolume;
 
 volatile bool flag_command[6] = {0}; // volatile is for interrupts.
 bool UART_using_flag_command[6] = {0}; // volatile is for interrupts.
@@ -262,8 +263,13 @@ static void mainTask(void *pvParameters)
       }
       else if (flag_screen[NEWVOLUME])
       {
-		lcd.setCursor(10, 2);
-        lcd.print(String((round(((float)volume) * 100 / 254) < 10 ? "  " : ((round(((float)volume) * 100 / 254) < 100 ? " " : "")))) + String("VOL : ") + String(round(((float)volume) * 100 / 254)) + "%");
+		    
+		    lcd.setCursor(10, 2);
+        lcd.print("VOL: ");
+        lcd.print(dispvolume);
+        lcd.print("%");
+        
+        // lcd.print(String((round(((float)volume) * 100 / 254) < 10 ? "  " : ((round(((float)volume) * 100 / 254) < 100 ? " " : "")))) + String("VOL : ") + String(round(((float)volume) * 100 / 254)) + "%");
         volumeCounter = 2; //seconds to be displayed. Actually, will be between 2 and 3 seconds.
         flag_screen[NEWVOLUME]=false;
         UART_using_flag_command[VOLPLUS] = false;
@@ -726,6 +732,8 @@ void parse(char *line)
   if ((ici = strstr(line, "VOL#:")) != NULL)
   {
     volume = atoi(ici + 6);
+    dispvolume = (uint8_t) ((float) volume / 2.56);
+    
     flag_screen[NEWVOLUME] = true; 
   }
 }
