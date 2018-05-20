@@ -451,11 +451,13 @@ static void buttonsPollingTask(void *pvParameters)
     button[VOLMINUS] = READPORTA(VOLMINUS);
     button[CHANPLUS] = READPORTA(CHANPLUS);
     button[CHANMINUS] = READPORTA(CHANMINUS);
+    
     button[MODE] = READPORTA(MODE + 4); // PA15
 
     //debug
     //Serial.println(String(button[PLAYPAUSE]) + " " + String(count[PLAYPAUSE]));
-    for (int i = 0; i < 6; i++)
+    // #################### Disabled polling on A15 !! ###############
+    for (int i = 0; i < NBR_BUTTONS; i++)
     {
       // if we start pushing on it
       if (button[i] < 5 && prev_button[i] != button[i] && flag_command[i] == false)
@@ -463,7 +465,7 @@ static void buttonsPollingTask(void *pvParameters)
         // Fill a counter... When the counter is full, take action !
         polling = FAST_POLLING;
         count[i]++;
-        if (count[i] >= 10 * FAST_POLLING) // 20 ms
+        if (count[i] >= POLLCOUNTER * FAST_POLLING) // 20 ms
         {
           count[i] = 0;
           prev_button[i] = button[i];
@@ -480,7 +482,7 @@ static void buttonsPollingTask(void *pvParameters)
         // Fill a counter... When full, take action ! here, action = reset the prev_button so that we are able to push it again.
         polling = FAST_POLLING;
         count[i]++;
-        if (count[i] >= 10 * FAST_POLLING) // mini 20 ms
+        if (count[i] >= POLLCOUNTER * FAST_POLLING) // mini 20 ms
         {
           count[i] = 0;
           prev_button[i] = button[i];
@@ -495,6 +497,7 @@ static void buttonsPollingTask(void *pvParameters)
     vTaskDelay(polling); // polling adaptatif !
   }
 }
+
 
 //Setup all things, check for contrast adjust and show initial page.
 // ######################### SETUP #################################
@@ -591,13 +594,14 @@ void setup(void)
   int s4 = pdPASS;
   int s5 = xTaskCreate(printScrollRTOSTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, &xHandlePrintScroll);
   int s6 = xTaskCreate(buttonsPollingTask, NULL, configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
-
+  
   if (s1 != pdPASS || s2 != pdPASS || s3 != pdPASS || s4 != pdPASS || s5 != pdPASS || s6 != pdPASS)
   {
     Serial.println(F("Task or Semaphore creation problem.."));
     while (1)
       ;
   }
+  
   // ######################### TASKS LAUNCH #################################
   timer2_init(); // initialize timer2
   // Start the task scheduler - here the process starts
