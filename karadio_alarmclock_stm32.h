@@ -43,13 +43,14 @@
 #define READPORTA(n) (GPIOA->regs->IDR & (1 << (6+n)))
 #define NBR_BUTTONS 6
 
-// FLAG_BUTTONS
+// COMMAND.FLAG/WAITING
 #define PLAYPAUSE 0
 #define VOLPLUS 1
 #define VOLMINUS 2
 #define CHANPLUS 3
 #define CHANMINUS 4
 #define MODE 5
+#define FIXVOL 6
 
 // FLAG_SCREEN
 #define NEWTITLE1   0
@@ -93,6 +94,8 @@
 #define SET_BIT(number, x) (number |= 1UL << x)
 #define CLEAR_BIT(number, x) (number &= ~(1UL << x))
 #define READ_BIT(number, n) ((number >> n) & 1U)
+
+#define TIMESTAMP_CUR (hours*3600 + minutes*60 + seconds)
 
 // macros to manipulate the alarm
 #define READ_ALARM_HOURS   ((alarm & 0b111111111111) / 60)
