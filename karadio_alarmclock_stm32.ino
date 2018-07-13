@@ -781,13 +781,21 @@ void parse(char *line)
   //////Volume   ##CLI.VOL#:
   if ((ici = strstr(line, "VOL#:")) != NULL)
   {
-    volume = atoi(ici + 6);
-    dispvolume = (uint8_t) ((((uint16_t) volume) * 100 ) >> 8);
-    CLEAR_BIT(command.waiting, VOLPLUS);  
-    CLEAR_BIT(command.waiting, VOLMINUS); 
-    CLEAR_BIT(command.waiting, FIXVOL);
+    
+    if (READ_BIT(command.waiting, FIXVOL) || READ_BIT(command.waiting, VOLPLUS) || READ_BIT(command.waiting, VOLMINUS))
+    {
+    // update the volume ONLY if we set it manually. This is a workaround for the karadio issue with 
+    // the register of the VS1053 wrongly ready.
+      volume = atoi(ici + 6);
+      dispvolume = (uint8_t) ((((uint16_t) volume) * 100 ) >> 8);
+      CLEAR_BIT(command.waiting, VOLPLUS);  
+      CLEAR_BIT(command.waiting, VOLMINUS); 
+      CLEAR_BIT(command.waiting, FIXVOL);
+  
+      flag_screen[NEWVOLUME] = true; 
+    }
+    
 
-    flag_screen[NEWVOLUME] = true; 
   }
 }
 
