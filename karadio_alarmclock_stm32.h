@@ -33,8 +33,8 @@
 #define PIN_LED LED_BUILTIN
 
 // adaptative polling times (ms) for buttons, and macro for reading values
-// Buttons are polled @100Hz when inactive 
-#define SLOW_POLLING 10
+// Buttons are polled @50Hz when inactive 
+#define SLOW_POLLING 20
 // Buttons are polled @1000Hz when active
 #define FAST_POLLING 1
 // Records 15 polls (lasting 15 ms then) before taking action
@@ -88,6 +88,11 @@
 
 // macro to check UART being used for button:
 #define UART_USED (UART_using_flag_command[0] || UART_using_flag_command[1] || UART_using_flag_command[2] || UART_using_flag_command[3] || UART_using_flag_command [4] || UART_using_flag_command[5])
+#define SET_VAL_BIT(number, n, x) (number ^= (-(unsigned char)x ^ number) & (1UL << n))
+
+#define SET_BIT(number, x) (number |= 1UL << x)
+#define CLEAR_BIT(number, x) (number &= ~(1UL << x))
+#define READ_BIT(number, n) ((number >> n) & 1U)
 
 // macros to manipulate the alarm
 #define READ_ALARM_HOURS   ((alarm & 0b111111111111) / 60)
