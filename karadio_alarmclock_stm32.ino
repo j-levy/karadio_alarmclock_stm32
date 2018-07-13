@@ -13,25 +13,18 @@ char nameset[BUFLEN] = {"0"};
 uint8_t volume;
 uint8_t dispvolume;
 
-volatile bool flag_command[6] = {0}; // volatile is for interrupts.
-bool UART_using_flag_command[6] = {0}; // volatile is for interrupts.
-
 unsigned char hours;
 unsigned char minutes;
 unsigned char seconds;
 
 bool flag_screen[10] = {false};
 
-bool isLight = true;
 bool isLCDused = false;
 bool isPlaying = true;
 bool isMode2ON = false;
 
 unsigned ledcount = 0; // led counter
-unsigned timerScreen = 0;
-unsigned timerScroll = 0;
 char volumeCounter = -1;
-unsigned timein = 0;
 
 struct tm *dt;
 
@@ -46,8 +39,19 @@ struct InfoScroll
 
 InfoScroll Song = {0, (char *)"INIT...", 2, 900};
 
-uint16 alarm;
+//bool flag_command[6] = {0}; // volatile is for interrupts.
+//bool UART_using_flag_command[6] = {0}; // volatile is for interrupts.
 
+struct UART_cmd{
+   uint8_t flag;
+   uint8_t waiting;
+   int16_t timestamp;
+   uint8_t timeout;
+};
+
+UART_cmd command = {0,0,-1,2};
+
+uint16 alarm;
 bool isAskingTime;
 bool isAskingIP;
 bool isIPInvalid;
@@ -86,6 +90,7 @@ void timer2_init()
 
 void TIM2_IRQHandler() // Timer2 Interrupt Handler
 {
+  
   if (++ledcount == (F_INTERRUPTS)) //1 sec
   {
 
@@ -93,8 +98,15 @@ void TIM2_IRQHandler() // Timer2 Interrupt Handler
     
     // Count the time (+1 second).
     localTime();
+
+    if (TIMESTAMP_CUR > command.timestamp + command.timeout)
+    {
+      command.timestamp = -1;
+      command.waiting = 0; // do not wait for anything anymore.
+    }
     //Serial.println(seconds);
   }
+  
 }
 
 void localTime()
@@ -139,7 +151,7 @@ void localTime()
     // check alarm clock.
 
     if (hours == READ_ALARM_HOURS && minutes == READ_ALARM_MINUTES && seconds == 0 && !isPlaying && READ_ALARM_STATE == 1)
-      flag_command[PLAYPAUSE]=true; // act as if the play-pause button was pressed !
+      SET_BIT(command.flag, PLAYPAUSE);
   } // endif(seconds)
 }
 
@@ -195,9 +207,11 @@ static void printScrollRTOSTask(void *pvParameters)
       {
         finished = true;
         flag_screen[NEWTITLE2]=false; // remember, we have to update 2 different locations. First is, when we CLEAN UP the whole line, Second is here.
+        /*
         UART_using_flag_command[PLAYPAUSE] = false;
         UART_using_flag_command[CHANPLUS] = false;
         UART_using_flag_command[CHANMINUS] = false;
+        */
       }
     } // endwhile(!finished)
   }   // endwhile(1)
@@ -218,7 +232,6 @@ static void mainTask(void *pvParameters)
       
       isLCDused = true;
       
-
       // Clean up the whole line
       if (flag_screen[NEWTITLE1])
       {
@@ -269,15 +282,13 @@ static void mainTask(void *pvParameters)
         lcd.print(dispvolume);
         lcd.print("%");
         
-        // lcd.print(String((round(((float)volume) * 100 / 254) < 10 ? "  " : ((round(((float)volume) * 100 / 254) < 100 ? " " : "")))) + String("VOL : ") + String(round(((float)volume) * 100 / 254)) + "%");
         volumeCounter = 2; //seconds to be displayed. Actually, will be between 2 and 3 seconds.
         flag_screen[NEWVOLUME]=false;
-        UART_using_flag_command[VOLPLUS] = false;
-        UART_using_flag_command[VOLMINUS] = false;
       }
 
       if (flag_screen[NEWALARM])
       {
+        
         lcd.setCursor(0, 2);
         lcd.print((isMode2ON ? "     >" : "") \
 					+ String((READ_ALARM_HOURS <= 9 ? "0" : "")) + String(READ_ALARM_HOURS) \
@@ -297,7 +308,20 @@ static void mainTask(void *pvParameters)
         flag_screen[NEWIP]=false;
 	    }
 
-
+      if (flag_screen[TOGGLELIGHT])
+      {
+        if (isMode2ON)
+        {
+          lcd.backlight();
+        } else {
+          if (isPlaying)
+            lcd.backlight();
+          else
+            lcd.noBacklight();
+        }
+      flag_screen[TOGGLELIGHT] = false;
+      }
+      
       isLCDused = false;
     }
     vTaskDelay(FREQ_TASK_SCREEN); // update the screen @5Hz (should be fast enough !)
@@ -316,73 +340,85 @@ static void uartTask(void *pvParameters)
   while (1)
   {
     // Mode 1 - control the radio.
-    if ((flag_command[PLAYPAUSE] || flag_command[VOLPLUS] || flag_command[VOLMINUS] || flag_command[CHANPLUS] || flag_command[CHANMINUS]))
+    if (command.flag)
     {
-      if (!isMode2ON && !(UART_USED))
+      if (!isMode2ON && !command.waiting && READ_BIT(command.flag, MODE) == 0)
       {
-        char cmd[20];
-
-        if (flag_command[PLAYPAUSE])
+        char cmd[25];
+      
+        if (READ_BIT(command.flag, PLAYPAUSE))
         {
           strcpy(cmd,(!isPlaying ? "cli.start\r" : "cli.stop\r"));
           isPlaying = !isPlaying;
-          flag_command[PLAYPAUSE] = false;
-          UART_using_flag_command[PLAYPAUSE] = true;
+          CLEAR_BIT(command.flag, PLAYPAUSE);
+          SET_BIT(command.waiting, PLAYPAUSE);
         }
-        else if (flag_command[CHANPLUS])
+        else if (READ_BIT(command.flag, CHANPLUS))
         {
           strcpy(cmd, "cli.prev\r");
-          flag_command[CHANPLUS] = false;
-          UART_using_flag_command[CHANPLUS] = true;
+          CLEAR_BIT(command.flag, CHANPLUS);
+          SET_BIT(command.waiting, CHANPLUS);
         }
-        else if (flag_command[CHANMINUS])
+        else if (READ_BIT(command.flag, CHANMINUS))
         {
           strcpy(cmd, "cli.next\r");
-          flag_command[CHANMINUS] = false;
-          UART_using_flag_command[CHANMINUS] = true;
+          CLEAR_BIT(command.flag, CHANMINUS);
+          SET_BIT(command.waiting, CHANMINUS);
         }
-        else if (flag_command[VOLPLUS])
+        else if (READ_BIT(command.flag, VOLPLUS))
         {
           strcpy(cmd,"cli.vol+\r");
-          flag_command[VOLPLUS] = false;
-          UART_using_flag_command[VOLPLUS] = true;
+          CLEAR_BIT(command.flag, VOLPLUS);
+          SET_BIT(command.waiting, VOLPLUS);
         }
-        else if (flag_command[VOLMINUS])
+        else if (READ_BIT(command.flag, VOLMINUS))
         {
           strcpy(cmd,"cli.vol-\r");
-          flag_command[VOLMINUS] = false;
-          UART_using_flag_command[VOLMINUS] = true;
+          
+          CLEAR_BIT(command.flag, VOLMINUS);
+          SET_BIT(command.waiting, VOLMINUS);
+        }
+        else if (READ_BIT(command.flag, FIXVOL))
+        {
+
+          
+          String str = "cli.vol(\"" + String(volume) + "\")\r";
+          str.toCharArray(cmd, 25);
+          
+          CLEAR_BIT(command.flag, FIXVOL);
+          SET_BIT(command.waiting, FIXVOL);
         }
         SERIALX.print(F("\r")); // cleaner
         SERIALX.print(F(cmd));
+        command.timestamp = TIMESTAMP_CUR;
         digitalWrite(PC13, LOW);
       }
       else if (isMode2ON)
       { // MODE 2 : ALARM
-        if (flag_command[PLAYPAUSE])
+        if (READ_BIT(command.flag, PLAYPAUSE))
         {
           FLIP_ALARM_STATE;
-          flag_command[PLAYPAUSE] = false;
+          CLEAR_BIT(command.flag, PLAYPAUSE);
         }
-        else if (flag_command[CHANPLUS])
+        else if (READ_BIT(command.flag, CHANPLUS))
         {
           alarm = CHANGE_ALARM(1, 0);
-          flag_command[CHANPLUS] = false;
+          CLEAR_BIT(command.flag, CHANPLUS);
         }
-        else if (flag_command[CHANMINUS])
+        else if (READ_BIT(command.flag, CHANMINUS))
         {
           alarm = CHANGE_ALARM(-1, 0);
-          flag_command[CHANMINUS] = false;
+          CLEAR_BIT(command.flag, CHANMINUS);
         }
-        else if (flag_command[VOLPLUS])
+        else if (READ_BIT(command.flag, VOLPLUS))
         {
           alarm = CHANGE_ALARM(0, 1);
-          flag_command[VOLPLUS] = false;
+          CLEAR_BIT(command.flag, VOLPLUS);
         }
-        else if (flag_command[VOLMINUS])
+        else if (READ_BIT(command.flag, VOLMINUS))
         {
           alarm = CHANGE_ALARM(0, -1);
-          flag_command[VOLMINUS] = false;
+          CLEAR_BIT(command.flag, VOLMINUS);
         }
         flag_screen[NEWALARM]=true;
         digitalWrite(PC13, LOW);
@@ -390,9 +426,9 @@ static void uartTask(void *pvParameters)
       
     }
 
-    if (flag_command[MODE])
+    if (READ_BIT(command.flag, MODE))
     {
-      // at mode change, save the alarm in EEPROM.
+      // at mode exit, save the alarm in EEPROM.
       if (isMode2ON)
       {
         uint16 Status;
@@ -409,7 +445,8 @@ static void uartTask(void *pvParameters)
       
       isMode2ON = !isMode2ON;
       flag_screen[NEWALARM]=true;
-      flag_command[MODE]=false;
+      flag_screen[TOGGLELIGHT]=true;
+      CLEAR_BIT(command.flag, MODE);
       digitalWrite(PC13, LOW);
     }
 
@@ -460,19 +497,20 @@ static void buttonsPollingTask(void *pvParameters)
     for (int i = 0; i < NBR_BUTTONS; i++)
     {
       // if we start pushing on it
-      if (button[i] < 5 && prev_button[i] != button[i] && flag_command[i] == false)
+      if (button[i] < 5 && prev_button[i] != button[i] && READ_BIT(command.flag, i) == 0)
       {
         // Fill a counter... When the counter is full, take action !
         polling = FAST_POLLING;
         count[i]++;
-        if (count[i] >= POLLCOUNTER * FAST_POLLING) // 20 ms
+        if (count[i] >= POLLCOUNTER * FAST_POLLING) // 10 ms
         {
           count[i] = 0;
           prev_button[i] = button[i];
-          flag_command[i] = true;
+          SET_BIT(command.flag, i);
           // The delay and the DigitalWrite on PC13 is for debug. PC13 is BUILTIN_LED.
           vTaskDelay(20);
           digitalWrite(PC13, HIGH);
+          
           polling = SLOW_POLLING; //ms. Reset polling frequency to something slower.
         }
         // if we release it
@@ -674,32 +712,40 @@ void parse(char *line)
 
     ///  cleartitle(3);
     strcpy(title, "STOPPED");
-    lcd.noBacklight();
-    if (state==true)
+    
+    if (isPlaying)
     {
       vTaskSuspend(xHandlePrintScroll); // relieve the CPU by disabling one useless task.
-      
+
+      /*
         UART_using_flag_command[PLAYPAUSE] = false;
         UART_using_flag_command[CHANPLUS] = false;
         UART_using_flag_command[CHANMINUS] = false;
+      */
+      CLEAR_BIT(command.waiting, PLAYPAUSE);  
+      CLEAR_BIT(command.waiting, CHANPLUS);  
+      CLEAR_BIT(command.waiting, CHANMINUS);  
       
-      state = false;
+      isPlaying = false;
     }
     flag_screen[NEWTITLE1] = true;
+    flag_screen[TOGGLELIGHT] = true;
   }
   else if ((ici = strstr(line, "YING#")) != NULL)
   {
-    lcd.backlight();
-    if (state==false)
+    
+    if (isPlaying==false)
     {
-        vTaskResume(xHandlePrintScroll); // start back the scrlling
+      vTaskResume(xHandlePrintScroll); // start back the scrlling
         
-        UART_using_flag_command[PLAYPAUSE] = false;
-        UART_using_flag_command[CHANPLUS] = false;
-        UART_using_flag_command[CHANMINUS] = false;
-        
-      state = true;
+      CLEAR_BIT(command.waiting, PLAYPAUSE);  
+      CLEAR_BIT(command.waiting, CHANPLUS);  
+      CLEAR_BIT(command.waiting, CHANMINUS);  
+
+      SET_BIT(command.flag, FIXVOL);  
+      isPlaying = true;
     }
+    flag_screen[TOGGLELIGHT] = true; // isPlaying == true here, so light should be on.
   }
   //////Date Time  ##SYS.DATE#: 2017-04-12T21:07:59+01:00
 
@@ -735,10 +781,21 @@ void parse(char *line)
   //////Volume   ##CLI.VOL#:
   if ((ici = strstr(line, "VOL#:")) != NULL)
   {
-    volume = atoi(ici + 6);
-    dispvolume = (uint8_t) ((float) volume / 2.56);
     
-    flag_screen[NEWVOLUME] = true; 
+    if (READ_BIT(command.waiting, FIXVOL) || READ_BIT(command.waiting, VOLPLUS) || READ_BIT(command.waiting, VOLMINUS))
+    {
+    // update the volume ONLY if we set it manually. This is a workaround for the karadio issue with 
+    // the register of the VS1053 wrongly ready.
+      volume = atoi(ici + 6);
+      dispvolume = (uint8_t) ((((uint16_t) volume) * 100 ) >> 8);
+      CLEAR_BIT(command.waiting, VOLPLUS);  
+      CLEAR_BIT(command.waiting, VOLMINUS); 
+      CLEAR_BIT(command.waiting, FIXVOL);
+  
+      flag_screen[NEWVOLUME] = true; 
+    }
+    
+
   }
 }
 

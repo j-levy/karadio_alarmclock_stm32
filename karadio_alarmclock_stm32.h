@@ -6,7 +6,6 @@
 #include <time.h>
 #include <EEPROM.h>
 
-
 /* TIMERS */
 // Hardware timer 2 of the STM32
 // used for all timers in this software
@@ -24,7 +23,7 @@
 
 // the LCD screen size
 #define LCD_WIDTH 20
-#define BUFLEN  128
+#define BUFLEN  192
 #define LINES  4
 
 #undef SERIAL_RX_BUFFER_SIZE
@@ -33,23 +32,25 @@
 #define PIN_LED LED_BUILTIN
 
 // adaptative polling times (ms) for buttons, and macro for reading values
-// Buttons are polled @100Hz when inactive 
-#define SLOW_POLLING 10
+// Buttons are polled @50Hz when inactive 
+#define SLOW_POLLING 20
 // Buttons are polled @1000Hz when active
 #define FAST_POLLING 1
 // Records 15 polls (lasting 15 ms then) before taking action
-#define POLLCOUNTER 15
+#define POLLCOUNTER 10
 
 #define READPORTA(n) (GPIOA->regs->IDR & (1 << (6+n)))
 #define NBR_BUTTONS 6
 
-// FLAG_BUTTONS
+// COMMAND.FLAG/WAITING
 #define PLAYPAUSE 0
 #define VOLPLUS 1
 #define VOLMINUS 2
 #define CHANPLUS 3
 #define CHANMINUS 4
 #define MODE 5
+// SPECIAL COMMANDS, NOT BUTTONS-RELATED
+#define FIXVOL 6
 
 // FLAG_SCREEN
 #define NEWTITLE1   0
@@ -63,7 +64,7 @@
 #define NEWIP 8
 
 // 
-#define FREQ_TASK_SCREEN 200
+#define FREQ_TASK_SCREEN 100
 
 // FREERTOS modifiers
 #undef INCLUDE_vTaskSuspend 
@@ -87,7 +88,12 @@
     // gotta profile the tasks! To know their exec time.
 
 // macro to check UART being used for button:
-#define UART_USED (UART_using_flag_command[0] || UART_using_flag_command[1] || UART_using_flag_command[2] || UART_using_flag_command[3] || UART_using_flag_command [4] || UART_using_flag_command[5])
+
+#define SET_BIT(number, x) (number |= 1UL << x)
+#define CLEAR_BIT(number, x) (number &= ~(1UL << x))
+#define READ_BIT(number, n) ((number >> n) & 1U)
+
+#define TIMESTAMP_CUR (hours*3600 + minutes*60 + seconds)
 
 // macros to manipulate the alarm
 #define READ_ALARM_HOURS   ((alarm & 0b111111111111) / 60)
