@@ -19,7 +19,6 @@ unsigned char seconds;
 
 bool flag_screen[10] = {false};
 
-bool isLight = true;
 bool isLCDused = false;
 bool isPlaying = true;
 bool isMode2ON = false;
@@ -51,7 +50,6 @@ struct UART_cmd{
 };
 
 UART_cmd command = {0,0,-1,2};
-
 
 uint16 alarm;
 bool isAskingTime;
