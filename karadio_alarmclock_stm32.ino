@@ -38,7 +38,7 @@ struct InfoScroll
   int waiting;
 };
 
-InfoScroll Song = {0, (char *)"INIT...", 2, 900};
+InfoScroll Song = {0, (char *)"INIT...", 3, 800};
 
 //bool flag_command[6] = {0}; // volatile is for interrupts.
 //bool UART_using_flag_command[6] = {0}; // volatile is for interrupts.
@@ -69,7 +69,7 @@ uint16 AddressWrite = 0x00; // write at the beginning of the page.
 TaskHandle_t xHandlePrintScroll = NULL;
 TaskHandle_t xHandleMain = NULL;
 
-#define DEBUG
+//#define DEBUG
 
 
 // init timer 2 for irmp led screen etc
@@ -112,8 +112,7 @@ void TIM2_IRQHandler() // Timer2 Interrupt Handler
 
 void localTime()
 {
-  // Using a timer to get triggered. Maybe one day I'll use the RTClock... but is it that necessary ?
-  //Serial.println(seconds);
+  // Using a timer to get triggered.
   seconds++;
   flag_screen[NEWTIME]=true; // this makes the ":" blink
   
@@ -491,9 +490,6 @@ static void buttonsPollingTask(void *pvParameters)
     button[CHANMINUS] = READPORTA(CHANMINUS);
     
     button[MODE] = READPORTA(MODE + 4); // PA15
-
-    //debug
-    //Serial.println(String(button[PLAYPAUSE]) + " " + String(count[PLAYPAUSE]));
     // #################### Disabled polling on A15 !! ###############
     for (int i = 0; i < NBR_BUTTONS; i++)
     {
@@ -694,7 +690,10 @@ void removeUtf8(byte *characters)
 void parse(char *line)
 {
   char *ici;
-  Serial.println(line);
+  #ifdef DEBUG
+    Serial.println(line);
+  #endif
+  
   removeUtf8((byte *)line);
 
   //////  reset of the esp
