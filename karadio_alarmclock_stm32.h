@@ -6,7 +6,6 @@
 #include <time.h>
 #include <EEPROM.h>
 
-
 /* TIMERS */
 // Hardware timer 2 of the STM32
 // used for all timers in this software
@@ -65,7 +64,7 @@
 #define NEWIP 8
 
 // 
-#define FREQ_TASK_SCREEN 200
+#define FREQ_TASK_SCREEN 100
 
 // FREERTOS modifiers
 #undef INCLUDE_vTaskSuspend 
@@ -89,8 +88,6 @@
     // gotta profile the tasks! To know their exec time.
 
 // macro to check UART being used for button:
-#define UART_USED (UART_using_flag_command[0] || UART_using_flag_command[1] || UART_using_flag_command[2] || UART_using_flag_command[3] || UART_using_flag_command [4] || UART_using_flag_command[5])
-#define SET_VAL_BIT(number, n, x) (number ^= (-(unsigned char)x ^ number) & (1UL << n))
 
 #define SET_BIT(number, x) (number |= 1UL << x)
 #define CLEAR_BIT(number, x) (number &= ~(1UL << x))

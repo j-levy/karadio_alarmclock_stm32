@@ -104,8 +104,6 @@ void TIM2_IRQHandler() // Timer2 Interrupt Handler
       command.timestamp = -1;
       command.waiting = 0; // do not wait for anything anymore.
     }
-      
-    
     //Serial.println(seconds);
   }
   
@@ -234,7 +232,6 @@ static void mainTask(void *pvParameters)
       
       isLCDused = true;
       
-
       // Clean up the whole line
       if (flag_screen[NEWTITLE1])
       {
@@ -285,7 +282,6 @@ static void mainTask(void *pvParameters)
         lcd.print(dispvolume);
         lcd.print("%");
         
-        // lcd.print(String((round(((float)volume) * 100 / 254) < 10 ? "  " : ((round(((float)volume) * 100 / 254) < 100 ? " " : "")))) + String("VOL : ") + String(round(((float)volume) * 100 / 254)) + "%");
         volumeCounter = 2; //seconds to be displayed. Actually, will be between 2 and 3 seconds.
         flag_screen[NEWVOLUME]=false;
       }
@@ -348,7 +344,7 @@ static void uartTask(void *pvParameters)
     {
       if (!isMode2ON && !command.waiting && READ_BIT(command.flag, MODE) == 0)
       {
-        char cmd[20];
+        char cmd[25];
       
         if (READ_BIT(command.flag, PLAYPAUSE))
         {
@@ -378,8 +374,19 @@ static void uartTask(void *pvParameters)
         else if (READ_BIT(command.flag, VOLMINUS))
         {
           strcpy(cmd,"cli.vol-\r");
+          
           CLEAR_BIT(command.flag, VOLMINUS);
           SET_BIT(command.waiting, VOLMINUS);
+        }
+        else if (READ_BIT(command.flag, FIXVOL))
+        {
+
+          
+          String str = "cli.vol(\"" + String(volume) + "\")\r";
+          str.toCharArray(cmd, 25);
+          
+          CLEAR_BIT(command.flag, FIXVOL);
+          SET_BIT(command.waiting, FIXVOL);
         }
         SERIALX.print(F("\r")); // cleaner
         SERIALX.print(F(cmd));
@@ -734,7 +741,8 @@ void parse(char *line)
       CLEAR_BIT(command.waiting, PLAYPAUSE);  
       CLEAR_BIT(command.waiting, CHANPLUS);  
       CLEAR_BIT(command.waiting, CHANMINUS);  
-        
+
+      SET_BIT(command.flag, FIXVOL);  
       isPlaying = true;
     }
     flag_screen[TOGGLELIGHT] = true; // isPlaying == true here, so light should be on.
@@ -774,9 +782,10 @@ void parse(char *line)
   if ((ici = strstr(line, "VOL#:")) != NULL)
   {
     volume = atoi(ici + 6);
-    dispvolume = (uint8_t) ((float) volume / 2.56);
+    dispvolume = (uint8_t) ((((uint16_t) volume) * 100 ) >> 8);
     CLEAR_BIT(command.waiting, VOLPLUS);  
     CLEAR_BIT(command.waiting, VOLMINUS); 
+    CLEAR_BIT(command.waiting, FIXVOL);
 
     flag_screen[NEWVOLUME] = true; 
   }
