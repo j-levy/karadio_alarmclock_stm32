@@ -325,6 +325,7 @@ static void mainTask(void *pvParameters)
         }
       flag_screen[TOGGLELIGHT] = false;
       }
+      
       isLCDused = false;
     }
     vTaskDelay(FREQ_TASK_SCREEN); // update the screen @5Hz (should be fast enough !)
@@ -345,7 +346,7 @@ static void uartTask(void *pvParameters)
     // Mode 1 - control the radio.
     if (command.flag)
     {
-      if (!isMode2ON && !command.waiting)
+      if (!isMode2ON && !command.waiting && READ_BIT(command.flag, MODE) == 0)
       {
         char cmd[20];
       
@@ -494,7 +495,7 @@ static void buttonsPollingTask(void *pvParameters)
         // Fill a counter... When the counter is full, take action !
         polling = FAST_POLLING;
         count[i]++;
-        if (count[i] >= POLLCOUNTER * FAST_POLLING) // 20 ms
+        if (count[i] >= POLLCOUNTER * FAST_POLLING) // 10 ms
         {
           count[i] = 0;
           prev_button[i] = button[i];
@@ -502,6 +503,7 @@ static void buttonsPollingTask(void *pvParameters)
           // The delay and the DigitalWrite on PC13 is for debug. PC13 is BUILTIN_LED.
           vTaskDelay(20);
           digitalWrite(PC13, HIGH);
+          
           polling = SLOW_POLLING; //ms. Reset polling frequency to something slower.
         }
         // if we release it

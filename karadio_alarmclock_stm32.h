@@ -24,7 +24,7 @@
 
 // the LCD screen size
 #define LCD_WIDTH 20
-#define BUFLEN  128
+#define BUFLEN  192
 #define LINES  4
 
 #undef SERIAL_RX_BUFFER_SIZE
@@ -38,7 +38,7 @@
 // Buttons are polled @1000Hz when active
 #define FAST_POLLING 1
 // Records 15 polls (lasting 15 ms then) before taking action
-#define POLLCOUNTER 15
+#define POLLCOUNTER 10
 
 #define READPORTA(n) (GPIOA->regs->IDR & (1 << (6+n)))
 #define NBR_BUTTONS 6
@@ -50,6 +50,7 @@
 #define CHANPLUS 3
 #define CHANMINUS 4
 #define MODE 5
+// SPECIAL COMMANDS, NOT BUTTONS-RELATED
 #define FIXVOL 6
 
 // FLAG_SCREEN
