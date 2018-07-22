@@ -151,7 +151,11 @@ void localTime()
     // check alarm clock.
 
     if (hours == READ_ALARM_HOURS && minutes == READ_ALARM_MINUTES && seconds == 0 && !isPlaying && READ_ALARM_STATE == 1)
+    {
       SET_BIT(command.flag, PLAYPAUSE);
+       
+    }
+      
   } // endif(seconds)
 }
 
@@ -749,7 +753,6 @@ void parse(char *line)
   }
   else if ((ici = strstr(line, "YING#")) != NULL)
   {
-    
     if (isPlaying==false)
     {
       vTaskResume(xHandlePrintScroll); // start back the scrlling
@@ -757,10 +760,10 @@ void parse(char *line)
       CLEAR_BIT(command.waiting, PLAYPAUSE);  
       CLEAR_BIT(command.waiting, CHANPLUS);  
       CLEAR_BIT(command.waiting, CHANMINUS);  
-
-      SET_BIT(command.flag, FIXVOL);  
+      
       isPlaying = true;
     }
+    SET_BIT(command.flag, FIXVOL);
     flag_screen[TOGGLELIGHT] = true; // isPlaying == true here, so light should be on.
   }
   //////Date Time  ##SYS.DATE#: 2017-04-12T21:07:59+01:00
@@ -810,8 +813,6 @@ void parse(char *line)
   
       flag_screen[NEWVOLUME] = true; 
     }
-    
-
   }
 }
 
