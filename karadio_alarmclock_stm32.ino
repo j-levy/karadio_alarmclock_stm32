@@ -4,14 +4,15 @@
 HardwareTimer timer(2);
 LiquidCrystal_I2C lcd(0x3f, LCD_WIDTH, LINES);
 
-bool state = false;               // start stop on Ok ir key
+
+//bool state = false;               // start stop on Ok ir key
 char line[SERIAL_RX_BUFFER_SIZE]; // receive buffer
 char station[BUFLEN];             //received station
 char title[BUFLEN];               // received title
 char nameset[BUFLEN] = {"0"};
 ; // the local name of the station
-uint8_t volume;
-uint8_t dispvolume;
+uint8_t volume = 150;
+uint8_t dispvolume = 60;
 
 unsigned char hours;
 unsigned char minutes;
@@ -37,7 +38,7 @@ struct InfoScroll
   int waiting;
 };
 
-InfoScroll Song = {0, (char *)"INIT...", 2, 900};
+InfoScroll Song = {0, (char *)"INIT...", 3, 800};
 
 //bool flag_command[6] = {0}; // volatile is for interrupts.
 //bool UART_using_flag_command[6] = {0}; // volatile is for interrupts.
@@ -68,7 +69,7 @@ uint16 AddressWrite = 0x00; // write at the beginning of the page.
 TaskHandle_t xHandlePrintScroll = NULL;
 TaskHandle_t xHandleMain = NULL;
 
-#define DEBUG
+//#define DEBUG
 
 
 // init timer 2 for irmp led screen etc
@@ -111,8 +112,7 @@ void TIM2_IRQHandler() // Timer2 Interrupt Handler
 
 void localTime()
 {
-  // Using a timer to get triggered. Maybe one day I'll use the RTClock... but is it that necessary ?
-  //Serial.println(seconds);
+  // Using a timer to get triggered.
   seconds++;
   flag_screen[NEWTIME]=true; // this makes the ":" blink
   
@@ -490,9 +490,6 @@ static void buttonsPollingTask(void *pvParameters)
     button[CHANMINUS] = READPORTA(CHANMINUS);
     
     button[MODE] = READPORTA(MODE + 4); // PA15
-
-    //debug
-    //Serial.println(String(button[PLAYPAUSE]) + " " + String(count[PLAYPAUSE]));
     // #################### Disabled polling on A15 !! ###############
     for (int i = 0; i < NBR_BUTTONS; i++)
     {
@@ -579,6 +576,7 @@ void setup(void)
   lcd.backlight();
   show = 0;
 
+
   // ######################### ALARM INIT #################################
   // Initialize the alarm. First step : hardcoded fixed alarm (like in regular clocks), set to 7h21
   alarm = 0; // initialize all bits to 0 beforehand!
@@ -657,17 +655,32 @@ void removeUtf8(byte *characters)
   int iindex = 0;
   while (characters[iindex])
   {
+    
     if ((characters[iindex] >= 0xc2) && (characters[iindex] <= 0xc3)) // only 0 to FF ascii char
     {
-      characters[iindex + 1] = ((characters[iindex] << 6) & 0xFF) | (characters[iindex + 1] & 0x3F);
+      //characters[iindex + 1] = ((characters[iindex] << 6) & 0xFF) | (characters[iindex + 1] & 0x3F);
       int sind = iindex + 1;
+      
+      if (characters[sind] >= 0xa0 && characters[sind] <= 0xa6)
+        characters[sind] = 'a';
+      else if (characters[sind] == 0xa7)
+        characters[sind] = 'c';
+      else if (characters[sind] >= 0xa8 && characters[sind] <= 0xab)
+        characters[sind] = 'e';
+      else if (characters[sind] >= 0xac && characters[sind] <= 0xaf)
+        characters[sind] = 'i';
+      else if (characters[sind] >= 0xb9 && characters[sind] <= 0xbc)
+        characters[sind] = 'u';
+      else if (characters[sind] >= 0xb2 && characters[sind] <= 0xb6)
+        characters[sind] = 'o';
+      
       while (characters[sind])
       {
         characters[sind - 1] = characters[sind];
         sind++;
       }
       characters[sind - 1] = 0;
-    }
+    }  
     iindex++;
   }
 }
@@ -677,7 +690,10 @@ void removeUtf8(byte *characters)
 void parse(char *line)
 {
   char *ici;
-  Serial.println(line);
+  #ifdef DEBUG
+    Serial.println(line);
+  #endif
+  
   removeUtf8((byte *)line);
 
   //////  reset of the esp
