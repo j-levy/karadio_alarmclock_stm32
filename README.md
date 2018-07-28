@@ -22,7 +22,9 @@ See more about my project on my blog : https://electronics-kitchen-table.blogspo
 ### Wiring
 
 #### LCD
+
 SDA  <---> PB7
+
 SCL  <---> PB6
 
 #### Buttons
@@ -30,20 +32,31 @@ SCL  <---> PB6
 PA15 <---> Select Mode
 
 Mode 1:
+
 PA6 <---> PLAY / PAUSE
+
 PA7 <---> Volume +
+
 PA8 <---> Volume -
+
 PA9 <---> Channel +
+
 PA10 <---> Channel -
 
 Mode 2:
+
 PA6 <---> Enable / Disable alarm clock
+
 PA7 <---> Minutes +
+
 PA8 <---> Minutes -
+
 PA9 <---> Hours +
+
 PA10 <---> Hours -
 
 #### UART
 
 PB11 <---> TX (ESP8266)
+
 PB10 <---> RX (ESP8266)
